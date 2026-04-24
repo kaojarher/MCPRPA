@@ -1,0 +1,1876 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MCP · Chrome RPA Controller</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0b0e;
+    --surface: #111318;
+    --surface2: #181c24;
+    --border: #252932;
+    --border2: #2e3440;
+    --accent: #00d4ff;
+    --accent2: #0088aa;
+    --green: #00ff88;
+    --red: #ff4455;
+    --yellow: #ffcc00;
+    --orange: #ff8800;
+    --text: #e0e6f0;
+    --text2: #8892a0;
+    --text3: #4a5568;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+    --radius: 4px;
+    --glow: 0 0 20px rgba(0,212,255,0.15);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ─── GRID SCAN LINE BACKGROUND ─── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      repeating-linear-gradient(0deg, transparent, transparent 24px, rgba(0,212,255,0.015) 25px),
+      repeating-linear-gradient(90deg, transparent, transparent 24px, rgba(0,212,255,0.01) 25px);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ─── HEADER ─── */
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(10,11,14,0.95);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 20px;
+    height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .header-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+  }
+
+  .brand-logo {
+    width: 28px; height: 28px;
+    background: var(--accent);
+    clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+    position: relative;
+    animation: pulse-logo 3s ease-in-out infinite;
+  }
+
+  @keyframes pulse-logo {
+    0%,100% { box-shadow: 0 0 0 rgba(0,212,255,0.5); }
+    50% { box-shadow: 0 0 16px rgba(0,212,255,0.4); }
+  }
+
+  .brand-title {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+  }
+
+  .brand-subtitle {
+    font-size: 10px;
+    color: var(--text3);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    display: block;
+    margin-top: 1px;
+  }
+
+  .header-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--text2);
+  }
+
+  .status-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 6px var(--green);
+    animation: blink 1.8s ease-in-out infinite;
+  }
+
+  .status-dot.idle { background: var(--text3); box-shadow: none; animation: none; }
+  .status-dot.running { background: var(--yellow); box-shadow: 0 0 6px var(--yellow); }
+  .status-dot.error { background: var(--red); box-shadow: 0 0 6px var(--red); animation: none; }
+
+  @keyframes blink {
+    0%,100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  .header-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-shrink: 0;
+  }
+
+  /* ─── MAIN LAYOUT ─── */
+  .app-shell {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: 280px 1fr 320px;
+    grid-template-rows: calc(100vh - 52px);
+    overflow: hidden;
+  }
+
+  @media (max-width: 1100px) {
+    .app-shell {
+      grid-template-columns: 240px 1fr;
+      grid-template-rows: auto;
+    }
+    .panel-log { display: none; }
+  }
+
+  @media (max-width: 700px) {
+    .app-shell {
+      grid-template-columns: 1fr;
+      grid-template-rows: auto;
+    }
+    .panel-commands { display: none; }
+    .mobile-nav { display: flex !important; }
+  }
+
+  /* ─── PANELS ─── */
+  .panel {
+    border-right: 1px solid var(--border);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .panel:last-child { border-right: none; }
+
+  .panel-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--surface);
+    flex-shrink: 0;
+  }
+
+  .panel-title {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: var(--text3);
+    font-weight: 500;
+  }
+
+  .panel-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+  }
+
+  .panel-body::-webkit-scrollbar { width: 4px; }
+  .panel-body::-webkit-scrollbar-track { background: transparent; }
+  .panel-body::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+  /* ─── BUTTONS ─── */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border: 1px solid var(--border2);
+    background: var(--surface2);
+    color: var(--text2);
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+
+  .btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(0,212,255,0.06); }
+  .btn:active { transform: scale(0.97); }
+
+  .btn-primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #000;
+    font-weight: 600;
+  }
+  .btn-primary:hover { background: #00b8d9; border-color: #00b8d9; color: #000; }
+
+  .btn-danger { border-color: var(--red); color: var(--red); }
+  .btn-danger:hover { background: rgba(255,68,85,0.1); }
+
+  .btn-success { border-color: var(--green); color: var(--green); }
+  .btn-success:hover { background: rgba(0,255,136,0.08); }
+
+  .btn-sm { padding: 4px 8px; font-size: 10px; }
+  .btn-icon { padding: 6px; width: 28px; height: 28px; justify-content: center; }
+
+  /* ─── COMMAND PALETTE ─── */
+  .cmd-search {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border2);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 7px 10px;
+    border-radius: var(--radius);
+    margin-bottom: 10px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  .cmd-search:focus { border-color: var(--accent); }
+  .cmd-search::placeholder { color: var(--text3); }
+
+  .cmd-group-label {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: var(--text3);
+    padding: 8px 0 4px;
+  }
+
+  .cmd-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: background 0.1s;
+    border: 1px solid transparent;
+    margin-bottom: 2px;
+  }
+
+  .cmd-item:hover { background: var(--surface2); border-color: var(--border); }
+
+  .cmd-item.dragging-source { opacity: 0.3; }
+
+  .cmd-icon {
+    width: 28px; height: 28px;
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+
+  .cmd-info { flex: 1; min-width: 0; }
+
+  .cmd-name {
+    font-size: 12px;
+    color: var(--text);
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .cmd-desc {
+    font-size: 10px;
+    color: var(--text3);
+    margin-top: 1px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .cmd-add { font-size: 16px; color: var(--text3); opacity: 0; transition: opacity 0.15s; }
+  .cmd-item:hover .cmd-add { opacity: 1; }
+
+  /* ─── STEP EDITOR ─── */
+  .steps-toolbar {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+
+  .script-name-input {
+    flex: 1;
+    min-width: 150px;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13px;
+    padding: 6px 10px;
+    border-radius: var(--radius);
+    outline: none;
+  }
+
+  .script-name-input:focus { border-color: var(--accent); }
+
+  .steps-list { display: flex; flex-direction: column; gap: 6px; min-height: 120px; }
+
+  .step-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 12px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    cursor: grab;
+    transition: all 0.15s;
+    position: relative;
+  }
+
+  .step-card:hover { border-color: var(--border2); }
+  .step-card.drag-over { border-color: var(--accent); background: rgba(0,212,255,0.05); }
+  .step-card.active-step { border-color: var(--yellow); box-shadow: 0 0 10px rgba(255,204,0,0.15); }
+  .step-card.done-step { border-color: var(--green); opacity: 0.7; }
+  .step-card.error-step { border-color: var(--red); }
+
+  .step-num {
+    font-size: 10px;
+    color: var(--text3);
+    min-width: 18px;
+    text-align: right;
+    margin-top: 2px;
+  }
+
+  .step-icon {
+    width: 26px; height: 26px;
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+
+  .step-content { flex: 1; min-width: 0; }
+
+  .step-type {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    margin-bottom: 4px;
+  }
+
+  .step-params { display: flex; flex-direction: column; gap: 4px; }
+
+  .step-param {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+  }
+
+  .step-param label { color: var(--text3); min-width: 60px; }
+
+  .step-param input, .step-param select, .step-param textarea {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 3px 6px;
+    border-radius: 2px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  .step-param input:focus,
+  .step-param select:focus,
+  .step-param textarea:focus { border-color: var(--accent); }
+
+  .step-param select option { background: var(--surface); }
+  .step-param textarea { resize: vertical; min-height: 40px; }
+
+  .step-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    align-items: center;
+  }
+
+  .step-delete {
+    background: none;
+    border: none;
+    color: var(--text3);
+    cursor: pointer;
+    font-size: 14px;
+    padding: 2px;
+    transition: color 0.15s;
+    line-height: 1;
+  }
+
+  .step-delete:hover { color: var(--red); }
+
+  .step-drag-handle {
+    color: var(--text3);
+    font-size: 14px;
+    cursor: grab;
+    user-select: none;
+  }
+
+  .step-status {
+    position: absolute;
+    right: 8px; top: 8px;
+    font-size: 12px;
+  }
+
+  .drop-zone {
+    border: 2px dashed var(--border2);
+    border-radius: var(--radius);
+    padding: 24px;
+    text-align: center;
+    color: var(--text3);
+    font-size: 12px;
+    transition: all 0.2s;
+    cursor: default;
+  }
+
+  .drop-zone.drag-over {
+    border-color: var(--accent);
+    background: rgba(0,212,255,0.04);
+    color: var(--accent);
+  }
+
+  /* ─── EXECUTION BAR ─── */
+  .exec-bar {
+    border-top: 1px solid var(--border);
+    padding: 10px 16px;
+    background: var(--surface);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    flex-shrink: 0;
+  }
+
+  .exec-progress {
+    flex: 1;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+    min-width: 80px;
+  }
+
+  .exec-progress-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+    transition: width 0.4s ease;
+    width: 0%;
+  }
+
+  .exec-info { font-size: 11px; color: var(--text3); }
+
+  /* ─── LOG PANEL ─── */
+  .log-entries {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .log-entry {
+    display: flex;
+    gap: 8px;
+    font-size: 11px;
+    padding: 4px 0;
+    border-bottom: 1px solid var(--border);
+    animation: fadeIn 0.2s ease;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .log-time { color: var(--text3); flex-shrink: 0; }
+  .log-level { flex-shrink: 0; font-weight: 600; width: 36px; }
+  .log-level.INFO { color: var(--accent); }
+  .log-level.OK { color: var(--green); }
+  .log-level.WARN { color: var(--yellow); }
+  .log-level.ERR { color: var(--red); }
+  .log-level.SYS { color: var(--text3); }
+  .log-msg { flex: 1; color: var(--text2); word-break: break-word; }
+
+  /* ─── SCRIPT LIBRARY ─── */
+  .script-list { display: flex; flex-direction: column; gap: 4px; }
+
+  .script-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .script-item:hover { border-color: var(--border2); }
+  .script-item.active { border-color: var(--accent); background: rgba(0,212,255,0.04); }
+
+  .script-item-name { flex: 1; font-size: 12px; }
+  .script-item-count { font-size: 10px; color: var(--text3); }
+
+  /* ─── TABS ─── */
+  .tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    flex-shrink: 0;
+  }
+
+  .tab {
+    padding: 10px 14px;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--text3);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+
+  .tab:hover { color: var(--text2); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  .tab-content { display: none; flex: 1; overflow: hidden; flex-direction: column; }
+  .tab-content.active { display: flex; }
+
+  /* ─── MCP CONFIG ─── */
+  .config-field {
+    margin-bottom: 12px;
+  }
+
+  .config-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--text3);
+    margin-bottom: 4px;
+    display: block;
+  }
+
+  .config-input {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border2);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 7px 10px;
+    border-radius: var(--radius);
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  .config-input:focus { border-color: var(--accent); }
+
+  /* ─── TAGS ─── */
+  .tag {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 2px;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  /* ─── COLOR THEMES for CMD types ─── */
+  .type-navigate { background: rgba(0,136,255,0.15); color: #4499ff; }
+  .type-click    { background: rgba(0,255,136,0.12); color: var(--green); }
+  .type-input    { background: rgba(255,204,0,0.12); color: var(--yellow); }
+  .type-wait     { background: rgba(255,136,0,0.12); color: var(--orange); }
+  .type-extract  { background: rgba(200,0,255,0.12); color: #cc44ff; }
+  .type-js       { background: rgba(255,68,85,0.12); color: var(--red); }
+  .type-scroll   { background: rgba(0,212,255,0.12); color: var(--accent); }
+  .type-capture  { background: rgba(100,200,255,0.12); color: #88ccff; }
+  .type-condition{ background: rgba(255,180,0,0.15); color: #ffcc44; }
+  .type-loop     { background: rgba(180,100,255,0.15); color: #cc88ff; }
+  .type-cookie   { background: rgba(0,200,150,0.12); color: #00cc99; }
+  .type-tab      { background: rgba(50,150,255,0.12); color: #5599ff; }
+
+  /* ─── TOOLTIP ─── */
+  [data-tip] { position: relative; }
+  [data-tip]:hover::after {
+    content: attr(data-tip);
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1a1f2e;
+    border: 1px solid var(--border2);
+    color: var(--text);
+    font-size: 10px;
+    padding: 4px 8px;
+    border-radius: 2px;
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 999;
+  }
+
+  /* ─── MOBILE NAV ─── */
+  .mobile-nav {
+    display: none;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    z-index: 200;
+    padding: 0 8px;
+  }
+
+  .mobile-nav-btn {
+    flex: 1;
+    padding: 10px 4px;
+    background: none;
+    border: none;
+    color: var(--text3);
+    font-family: var(--mono);
+    font-size: 10px;
+    cursor: pointer;
+    text-align: center;
+    transition: color 0.15s;
+  }
+
+  .mobile-nav-btn.active { color: var(--accent); }
+
+  /* ─── SCROLLBAR GLOBAL ─── */
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+  /* ─── BADGE ─── */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    background: var(--accent2);
+    color: #fff;
+    border-radius: 9px;
+    font-size: 9px;
+    font-weight: 600;
+    padding: 0 4px;
+  }
+
+  /* ─── EMPTY STATE ─── */
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 40px 20px;
+    color: var(--text3);
+    font-size: 12px;
+    text-align: center;
+  }
+
+  .empty-icon { font-size: 28px; margin-bottom: 4px; opacity: 0.4; }
+
+  /* ─── MODAL ─── */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(4px);
+    z-index: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+  }
+
+  .modal-overlay.open { opacity: 1; pointer-events: all; }
+
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    width: 100%;
+    max-width: 480px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+    transform: translateY(12px);
+    transition: transform 0.2s;
+  }
+
+  .modal-overlay.open .modal { transform: translateY(0); }
+
+  .modal-header {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .modal-title { font-size: 13px; font-weight: 600; color: var(--text); }
+
+  .modal-body { padding: 16px; }
+
+  .modal-footer {
+    padding: 12px 16px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+  }
+
+  /* Hidden file input */
+  #importFileInput { display: none; }
+
+  /* ─── RUNNING ANIMATION ─── */
+  @keyframes scan {
+    0% { background-position: 0 0; }
+    100% { background-position: 0 100px; }
+  }
+
+  .running-indicator {
+    display: none;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    background-size: 200% 100%;
+    animation: shimmer 1.2s linear infinite;
+  }
+
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+
+  .running-indicator.active { display: block; }
+
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-brand">
+    <div class="brand-logo"></div>
+    <div>
+      <div class="brand-title">MCP · RPA</div>
+      <span class="brand-subtitle">Chrome Controller</span>
+    </div>
+  </div>
+
+  <div class="header-status">
+    <div class="status-dot idle" id="statusDot"></div>
+    <span id="statusText">未連線</span>
+  </div>
+
+  <div class="header-actions">
+    <button class="btn btn-sm" onclick="openModal('configModal')" data-tip="MCP 設定">⚙ 設定</button>
+    <button class="btn btn-sm" onclick="importScript()" data-tip="匯入腳本">↑ 匯入</button>
+    <button class="btn btn-sm" onclick="exportScript()" data-tip="匯出腳本">↓ 匯出</button>
+    <input type="file" id="importFileInput" accept=".json" onchange="handleImport(event)">
+  </div>
+</header>
+
+<div class="running-indicator" id="runningIndicator"></div>
+
+<div class="app-shell">
+
+  <!-- ═══ LEFT: COMMAND PALETTE ═══ -->
+  <div class="panel panel-commands">
+    <div class="panel-header">
+      <span class="panel-title">指令庫</span>
+      <span class="badge" id="cmdCount">0</span>
+    </div>
+    <div class="panel-body">
+      <input class="cmd-search" placeholder="搜尋指令..." id="cmdSearch" oninput="filterCommands()">
+      <div id="commandList"></div>
+    </div>
+  </div>
+
+  <!-- ═══ CENTER: STEP EDITOR + SCRIPT LIBRARY ═══ -->
+  <div class="panel" style="border-right:none;">
+    <div class="tabs">
+      <div class="tab active" onclick="switchMainTab('editor')">腳本編輯器</div>
+      <div class="tab" onclick="switchMainTab('library')">腳本庫</div>
+      <div class="tab" onclick="switchMainTab('mcp')">MCP 設定</div>
+    </div>
+
+    <!-- EDITOR TAB -->
+    <div class="tab-content active" id="tab-editor">
+      <div class="panel-body">
+        <div class="steps-toolbar">
+          <input class="script-name-input" id="scriptName" value="未命名腳本" placeholder="腳本名稱">
+          <button class="btn btn-sm" onclick="clearSteps()" data-tip="清空步驟">✕ 清空</button>
+        </div>
+        <div class="steps-list" id="stepsList"></div>
+        <div class="drop-zone" id="dropZone">
+          ← 從左側拖曳指令到此處，或點擊指令旁的 <strong>+</strong> 加入步驟
+        </div>
+      </div>
+      <div class="exec-bar">
+        <button class="btn btn-success" onclick="runScript()" id="runBtn">▶ 執行</button>
+        <button class="btn btn-danger" onclick="stopScript()" id="stopBtn" style="display:none;">■ 停止</button>
+        <button class="btn btn-sm" onclick="stepScript()" id="stepBtn">▷ 單步</button>
+        <div class="exec-progress">
+          <div class="exec-progress-fill" id="progressFill"></div>
+        </div>
+        <div class="exec-info" id="execInfo">就緒</div>
+      </div>
+    </div>
+
+    <!-- LIBRARY TAB -->
+    <div class="tab-content" id="tab-library">
+      <div class="panel-body">
+        <div style="display:flex;gap:8px;margin-bottom:12px;">
+          <button class="btn btn-sm btn-primary" onclick="saveToLibrary()">+ 儲存目前腳本</button>
+          <button class="btn btn-sm" onclick="importScript()">↑ 匯入 JSON</button>
+        </div>
+        <div class="script-list" id="scriptLibraryList"></div>
+      </div>
+    </div>
+
+    <!-- MCP CONFIG TAB -->
+    <div class="tab-content" id="tab-mcp">
+      <div class="panel-body">
+        <div class="config-field">
+          <label class="config-label">MCP 伺服器端點</label>
+          <input class="config-input" id="mcpEndpoint" value="ws://localhost:9222/devtools" placeholder="ws://localhost:9222/devtools">
+        </div>
+        <div class="config-field">
+          <label class="config-label">Chrome 除錯埠</label>
+          <input class="config-input" id="chromePort" value="9222" placeholder="9222">
+        </div>
+        <div class="config-field">
+          <label class="config-label">連線逾時 (ms)</label>
+          <input class="config-input" id="timeout" value="30000" placeholder="30000">
+        </div>
+        <div class="config-field">
+          <label class="config-label">使用者代理</label>
+          <input class="config-input" id="userAgent" value="Mozilla/5.0 (compatible; MCP-RPA/1.0)" placeholder="User Agent">
+        </div>
+        <div class="config-field">
+          <label class="config-label">步驟間延遲 (ms)</label>
+          <input class="config-input" id="stepDelay" value="500" placeholder="500">
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-primary" onclick="connectMCP()">⬡ 連線 MCP</button>
+          <button class="btn btn-danger" onclick="disconnectMCP()">⬡ 斷線</button>
+          <button class="btn btn-sm" onclick="testConnection()">◎ 測試連線</button>
+        </div>
+
+        <div style="margin-top:20px;padding:14px;background:var(--bg);border:1px solid var(--border);border-radius:4px;">
+          <div class="config-label" style="margin-bottom:8px;">啟動 Chrome 除錯模式</div>
+          <div style="font-size:11px;color:var(--text2);line-height:1.7;">
+            Windows:<br>
+            <code style="color:var(--accent);font-size:10px;">chrome.exe --remote-debugging-port=9222</code><br><br>
+            macOS:<br>
+            <code style="color:var(--accent);font-size:10px;">/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --remote-debugging-port=9222</code><br><br>
+            Linux:<br>
+            <code style="color:var(--accent);font-size:10px;">google-chrome --remote-debugging-port=9222</code>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ RIGHT: LOG PANEL ═══ -->
+  <div class="panel panel-log" style="border-left:1px solid var(--border);">
+    <div class="panel-header">
+      <span class="panel-title">執行日誌</span>
+      <button class="btn btn-sm btn-icon" onclick="clearLog()" data-tip="清除日誌" style="font-size:14px;">⌫</button>
+    </div>
+    <div class="panel-body">
+      <div class="log-entries" id="logEntries"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- MOBILE NAV -->
+<div class="mobile-nav" id="mobileNav">
+  <button class="mobile-nav-btn active" onclick="mobileSwitch('cmds',this)">指令庫</button>
+  <button class="mobile-nav-btn" onclick="mobileSwitch('editor',this)">編輯器</button>
+  <button class="mobile-nav-btn" onclick="mobileSwitch('log',this)">日誌</button>
+</div>
+
+<!-- CONFIG MODAL -->
+<div class="modal-overlay" id="configModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">⚙ 快速設定</span>
+      <button class="btn btn-sm btn-icon" onclick="closeModal('configModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="config-field">
+        <label class="config-label">MCP 連線狀態</label>
+        <div style="font-size:12px;color:var(--text2);" id="modalStatus">—</div>
+      </div>
+      <div class="config-field">
+        <label class="config-label">執行速度</label>
+        <select class="config-input" id="execSpeed">
+          <option value="200">快速 (200ms)</option>
+          <option value="500" selected>正常 (500ms)</option>
+          <option value="1000">慢速 (1000ms)</option>
+          <option value="2000">超慢 (2000ms，除錯用)</option>
+        </select>
+      </div>
+      <div class="config-field">
+        <label class="config-label">錯誤處理</label>
+        <select class="config-input" id="errorHandling">
+          <option value="stop">遇錯停止</option>
+          <option value="skip">遇錯跳過</option>
+          <option value="retry">重試一次</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('configModal')">關閉</button>
+      <button class="btn btn-primary" onclick="applyConfig()">套用</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════
+//  DATA DEFINITIONS
+// ═══════════════════════════════════════════
+
+const COMMANDS = [
+  {
+    group: '導覽',
+    items: [
+      { id: 'navigate', name: '開啟網址', desc: 'Navigate to URL', icon: '🌐', type: 'navigate',
+        params: [
+          { key: 'url', label: 'URL', type: 'text', placeholder: 'https://example.com' }
+        ]
+      },
+      { id: 'tab_new', name: '新增分頁', desc: 'Open new tab', icon: '＋', type: 'tab',
+        params: [
+          { key: 'url', label: 'URL', type: 'text', placeholder: 'about:blank' }
+        ]
+      },
+      { id: 'tab_close', name: '關閉分頁', desc: 'Close current tab', icon: '✕', type: 'tab', params: [] },
+      { id: 'reload', name: '重新整理', desc: 'Reload page', icon: '↻', type: 'navigate', params: [] },
+      { id: 'back', name: '上一頁', desc: 'Go back', icon: '←', type: 'navigate', params: [] },
+      { id: 'forward', name: '下一頁', desc: 'Go forward', icon: '→', type: 'navigate', params: [] },
+    ]
+  },
+  {
+    group: '互動',
+    items: [
+      { id: 'click', name: '點擊元素', desc: 'Click element by selector', icon: '👆', type: 'click',
+        params: [
+          { key: 'selector', label: '選擇器', type: 'text', placeholder: '#button, .class, [attr]' },
+          { key: 'button', label: '按鍵', type: 'select', options: ['left','right','middle'] }
+        ]
+      },
+      { id: 'dblclick', name: '雙擊元素', desc: 'Double click element', icon: '👆', type: 'click',
+        params: [
+          { key: 'selector', label: '選擇器', type: 'text', placeholder: '#element' }
+        ]
+      },
+      { id: 'hover', name: '懸停元素', desc: 'Hover over element', icon: '🖱', type: 'click',
+        params: [
+          { key: 'selector', label: '選擇器', type: 'text', placeholder: '#menu-item' }
+        ]
+      },
+      { id: 'type', name: '輸入文字', desc: 'Type into element', icon: '⌨', type: 'input',
+        params: [
+          { key: 'selector', label: '選擇器', type: 'text', placeholder: 'input[name="username"]' },
+          { key: 'value', label: '文字', type: 'text', placeholder: '輸入內容' },
+          { key: 'clear', label: '先清空', type: 'select', options: ['true','false'] }
+        ]
+      },
+      { id: 'select', name: '下拉選擇', desc: 'Select option', icon: '☰', type: 'input',
+        params: [
+          { key: 'selector', label: '選擇器', type: 'text', placeholder: 'select#country' },
+          { key: 'value', label: '選項值', type: 'text', placeholder: 'TW' }
+        ]
+      },
+      { id: 'key_press', name: '按下按鍵', desc: 'Press keyboard key', icon: '⌥', type: 'input',
+        params: [
+          { key: 'key', label: '按鍵', type: 'text', placeholder: 'Enter, Tab, Escape, F5' }
+        ]
+      },
+      { id: 'scroll', name: '捲動頁面', desc: 'Scroll page', icon: '↕', type: 'scroll',
+        params: [
+          { key: 'direction', label: '方向', type: 'select', options: ['down','up','top','bottom'] },
+          { key: 'amount', label: '距離(px)', type: 'text', placeholder: '500' }
+        ]
+      },
+      { id: 'scroll_to', name: '捲動到元素', desc: 'Scroll to element', icon: '↕', type: 'scroll',
+        params: [
+          { key: 'selector', label: '選擇器', type: 'text', placeholder: '#target' }
+        ]
+      },
+    ]
+  },
+  {
+    group: '擷取',
+    items: [
+      { id: 'extract_text', name: '擷取文字', desc: 'Get element text content', icon: '📋', type: 'extract',
+        params: [
+          { key: 'selector', label: '選擇器', type: 'text', placeholder: 'h1.title' },
+          { key: 'var', label: '存入變數', type: 'text', placeholder: 'result' }
+        ]
+      },
+      { id: 'extract_attr', name: '擷取屬性', desc: 'Get element attribute', icon: '🏷', type: 'extract',
+        params: [
+          { key: 'selector', label: '選擇器', type: 'text', placeholder: 'img.hero' },
+          { key: 'attr', label: '屬性名', type: 'text', placeholder: 'src, href, value' },
+          { key: 'var', label: '存入變數', type: 'text', placeholder: 'imgUrl' }
+        ]
+      },
+      { id: 'screenshot', name: '截圖', desc: 'Take screenshot', icon: '📸', type: 'capture',
+        params: [
+          { key: 'name', label: '檔名', type: 'text', placeholder: 'screenshot_{timestamp}' },
+          { key: 'full', label: '全頁面', type: 'select', options: ['false','true'] }
+        ]
+      },
+      { id: 'get_url', name: '取得目前URL', desc: 'Get current page URL', icon: '🔗', type: 'extract',
+        params: [
+          { key: 'var', label: '存入變數', type: 'text', placeholder: 'currentUrl' }
+        ]
+      },
+    ]
+  },
+  {
+    group: '等待',
+    items: [
+      { id: 'wait', name: '等待時間', desc: 'Wait for milliseconds', icon: '⏱', type: 'wait',
+        params: [
+          { key: 'ms', label: '毫秒', type: 'text', placeholder: '1000' }
+        ]
+      },
+      { id: 'wait_selector', name: '等待元素', desc: 'Wait for element to appear', icon: '⏳', type: 'wait',
+        params: [
+          { key: 'selector', label: '選擇器', type: 'text', placeholder: '#loading-spinner' },
+          { key: 'state', label: '狀態', type: 'select', options: ['visible','hidden','exists'] },
+          { key: 'timeout', label: '逾時(ms)', type: 'text', placeholder: '10000' }
+        ]
+      },
+      { id: 'wait_url', name: '等待URL變化', desc: 'Wait for URL change', icon: '⏳', type: 'wait',
+        params: [
+          { key: 'contains', label: '包含字串', type: 'text', placeholder: '/dashboard' }
+        ]
+      },
+    ]
+  },
+  {
+    group: '邏輯控制',
+    items: [
+      { id: 'condition', name: '條件判斷', desc: 'If element exists/text matches', icon: '◇', type: 'condition',
+        params: [
+          { key: 'type', label: '類型', type: 'select', options: ['element_exists','text_contains','url_contains','variable_equals'] },
+          { key: 'selector', label: '選擇器/值', type: 'text', placeholder: '#error-msg' },
+          { key: 'value', label: '比較值', type: 'text', placeholder: '（選填）' }
+        ]
+      },
+      { id: 'loop', name: '迴圈', desc: 'Loop N times', icon: '↺', type: 'loop',
+        params: [
+          { key: 'times', label: '次數', type: 'text', placeholder: '5' },
+          { key: 'var', label: '計數器變數', type: 'text', placeholder: 'i' }
+        ]
+      },
+    ]
+  },
+  {
+    group: 'JavaScript',
+    items: [
+      { id: 'js_eval', name: '執行 JS', desc: 'Evaluate JavaScript in page', icon: '⚡', type: 'js',
+        params: [
+          { key: 'code', label: '程式碼', type: 'textarea', placeholder: 'return document.title;' },
+          { key: 'var', label: '存入變數', type: 'text', placeholder: 'result（選填）' }
+        ]
+      },
+      { id: 'js_inject', name: '注入腳本', desc: 'Inject script tag', icon: '📦', type: 'js',
+        params: [
+          { key: 'url', label: '腳本URL', type: 'text', placeholder: 'https://cdn.example.com/lib.js' }
+        ]
+      },
+    ]
+  },
+  {
+    group: 'Cookie / Storage',
+    items: [
+      { id: 'cookie_get', name: '取得 Cookie', desc: 'Get cookie value', icon: '🍪', type: 'cookie',
+        params: [
+          { key: 'name', label: 'Cookie名稱', type: 'text', placeholder: 'session_id' },
+          { key: 'var', label: '存入變數', type: 'text', placeholder: 'cookieVal' }
+        ]
+      },
+      { id: 'cookie_set', name: '設定 Cookie', desc: 'Set a cookie', icon: '🍪', type: 'cookie',
+        params: [
+          { key: 'name', label: 'Cookie名稱', type: 'text', placeholder: 'my_cookie' },
+          { key: 'value', label: '值', type: 'text', placeholder: 'my_value' }
+        ]
+      },
+      { id: 'storage_get', name: '取得 LocalStorage', desc: 'Get localStorage item', icon: '💾', type: 'cookie',
+        params: [
+          { key: 'key', label: 'Key', type: 'text', placeholder: 'token' },
+          { key: 'var', label: '存入變數', type: 'text', placeholder: 'token' }
+        ]
+      },
+    ]
+  },
+];
+
+// ═══════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════
+
+let steps = [];
+let scriptLibrary = JSON.parse(localStorage.getItem('mcp_rpa_library') || '[]');
+let isRunning = false;
+let shouldStop = false;
+let currentStepIdx = -1;
+let mcpConnected = false;
+let ws = null;
+let variables = {};
+let dragSrcId = null;
+
+// ═══════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════
+
+function init() {
+  renderCommands(COMMANDS);
+  renderScriptLibrary();
+  addLog('SYS', 'MCP RPA 控制器啟動');
+  addLog('SYS', '請至 MCP 設定 → 輸入 Chrome 除錯端點 → 連線');
+
+  // Drop zone events
+  const dz = document.getElementById('dropZone');
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+  dz.addEventListener('drop', e => {
+    e.preventDefault();
+    dz.classList.remove('drag-over');
+    if (dragSrcId) addStep(dragSrcId);
+  });
+}
+
+// ═══════════════════════════════════════════
+//  COMMAND PANEL
+// ═══════════════════════════════════════════
+
+function renderCommands(data) {
+  const list = document.getElementById('commandList');
+  const q = (document.getElementById('cmdSearch')?.value || '').toLowerCase();
+  list.innerHTML = '';
+  let total = 0;
+
+  data.forEach(group => {
+    const filtered = group.items.filter(c =>
+      c.name.toLowerCase().includes(q) || c.desc.toLowerCase().includes(q)
+    );
+    if (!filtered.length) return;
+    total += filtered.length;
+
+    const label = document.createElement('div');
+    label.className = 'cmd-group-label';
+    label.textContent = group.group;
+    list.appendChild(label);
+
+    filtered.forEach(cmd => {
+      const el = document.createElement('div');
+      el.className = 'cmd-item';
+      el.draggable = true;
+      el.innerHTML = `
+        <div class="cmd-icon type-${cmd.type}">${cmd.icon}</div>
+        <div class="cmd-info">
+          <div class="cmd-name">${cmd.name}</div>
+          <div class="cmd-desc">${cmd.desc}</div>
+        </div>
+        <div class="cmd-add">+</div>
+      `;
+      el.addEventListener('dragstart', () => { dragSrcId = cmd.id; el.classList.add('dragging-source'); });
+      el.addEventListener('dragend', () => { dragSrcId = null; el.classList.remove('dragging-source'); });
+      el.querySelector('.cmd-add').addEventListener('click', (e) => { e.stopPropagation(); addStep(cmd.id); });
+      list.appendChild(el);
+    });
+  });
+
+  document.getElementById('cmdCount').textContent = total;
+}
+
+function filterCommands() {
+  renderCommands(COMMANDS);
+}
+
+// ═══════════════════════════════════════════
+//  FIND COMMAND
+// ═══════════════════════════════════════════
+
+function findCmd(id) {
+  for (const g of COMMANDS) {
+    const c = g.items.find(x => x.id === id);
+    if (c) return c;
+  }
+  return null;
+}
+
+// ═══════════════════════════════════════════
+//  STEP MANAGEMENT
+// ═══════════════════════════════════════════
+
+function addStep(cmdId) {
+  const cmd = findCmd(cmdId);
+  if (!cmd) return;
+  const step = {
+    id: Date.now() + Math.random(),
+    cmdId,
+    values: {}
+  };
+  cmd.params.forEach(p => { step.values[p.key] = p.placeholder || ''; });
+  steps.push(step);
+  renderSteps();
+  addLog('SYS', `新增步驟：${cmd.name}`);
+}
+
+function removeStep(id) {
+  steps = steps.filter(s => s.id !== id);
+  renderSteps();
+}
+
+function renderSteps() {
+  const list = document.getElementById('stepsList');
+  const dz = document.getElementById('dropZone');
+
+  if (!steps.length) {
+    list.innerHTML = '';
+    dz.style.display = 'block';
+    return;
+  }
+
+  dz.style.display = 'none';
+  list.innerHTML = '';
+
+  steps.forEach((step, idx) => {
+    const cmd = findCmd(step.cmdId);
+    if (!cmd) return;
+
+    const card = document.createElement('div');
+    card.className = 'step-card';
+    card.dataset.id = step.id;
+
+    // Classes
+    if (idx === currentStepIdx && isRunning) card.classList.add('active-step');
+    if (step.status === 'done') card.classList.add('done-step');
+    if (step.status === 'error') card.classList.add('error-step');
+
+    const paramsHtml = cmd.params.map(p => {
+      if (p.type === 'textarea') {
+        return `<div class="step-param">
+          <label>${p.label}</label>
+          <textarea oninput="updateStepValue('${step.id}','${p.key}',this.value)">${step.values[p.key] || ''}</textarea>
+        </div>`;
+      } else if (p.type === 'select') {
+        const opts = p.options.map(o => `<option ${step.values[p.key]===o?'selected':''}>${o}</option>`).join('');
+        return `<div class="step-param">
+          <label>${p.label}</label>
+          <select onchange="updateStepValue('${step.id}','${p.key}',this.value)">${opts}</select>
+        </div>`;
+      } else {
+        return `<div class="step-param">
+          <label>${p.label}</label>
+          <input type="text" value="${step.values[p.key] || ''}" placeholder="${p.placeholder || ''}"
+            oninput="updateStepValue('${step.id}','${p.key}',this.value)">
+        </div>`;
+      }
+    }).join('');
+
+    const statusIcon = step.status === 'done' ? '✓' : step.status === 'error' ? '✗' : '';
+
+    card.innerHTML = `
+      <div class="step-num">${idx+1}</div>
+      <div class="step-icon type-${cmd.type}">${cmd.icon}</div>
+      <div class="step-content">
+        <div class="step-type type-${cmd.type}">${cmd.name}</div>
+        <div class="step-params">${paramsHtml}</div>
+      </div>
+      <div class="step-actions">
+        <span class="step-drag-handle" draggable="true" title="拖曳排序">⠿</span>
+        <button class="step-delete" onclick="removeStep(${step.id})" title="刪除">✕</button>
+      </div>
+      <div class="step-status">${statusIcon}</div>
+    `;
+
+    // Drag reorder
+    const handle = card.querySelector('.step-drag-handle');
+    handle.addEventListener('dragstart', (e) => {
+      e.dataTransfer.setData('stepId', step.id);
+      card.classList.add('dragging-source');
+    });
+    handle.addEventListener('dragend', () => card.classList.remove('dragging-source'));
+    card.addEventListener('dragover', e => { e.preventDefault(); card.classList.add('drag-over'); });
+    card.addEventListener('dragleave', () => card.classList.remove('drag-over'));
+    card.addEventListener('drop', e => {
+      e.preventDefault();
+      card.classList.remove('drag-over');
+      const srcId = parseFloat(e.dataTransfer.getData('stepId'));
+      if (!srcId || srcId === step.id) return;
+      const srcIdx = steps.findIndex(s => s.id === srcId);
+      const tgtIdx = steps.findIndex(s => s.id === step.id);
+      const [moved] = steps.splice(srcIdx, 1);
+      steps.splice(tgtIdx, 0, moved);
+      renderSteps();
+    });
+
+    list.appendChild(card);
+  });
+}
+
+function updateStepValue(stepId, key, val) {
+  const step = steps.find(s => s.id == stepId);
+  if (step) step.values[key] = val;
+}
+
+function clearSteps() {
+  if (steps.length && !confirm('確定清空所有步驟？')) return;
+  steps = [];
+  currentStepIdx = -1;
+  renderSteps();
+}
+
+// ═══════════════════════════════════════════
+//  EXECUTION ENGINE
+// ═══════════════════════════════════════════
+
+async function runScript() {
+  if (!steps.length) { addLog('WARN', '無可執行步驟'); return; }
+  if (isRunning) return;
+
+  isRunning = true;
+  shouldStop = false;
+  currentStepIdx = -1;
+  variables = {};
+
+  steps.forEach(s => { s.status = ''; });
+
+  document.getElementById('runBtn').style.display = 'none';
+  document.getElementById('stopBtn').style.display = '';
+  document.getElementById('runningIndicator').classList.add('active');
+  setStatus('running', '執行中...');
+
+  addLog('INFO', `▶ 開始執行：${document.getElementById('scriptName').value}`);
+  addLog('INFO', `共 ${steps.length} 個步驟`);
+
+  const delay = parseInt(document.getElementById('stepDelay')?.value) ||
+                parseInt(document.getElementById('execSpeed')?.value) || 500;
+
+  for (let i = 0; i < steps.length; i++) {
+    if (shouldStop) {
+      addLog('WARN', '⏸ 執行已停止');
+      break;
+    }
+
+    currentStepIdx = i;
+    renderSteps();
+    updateProgress(i, steps.length);
+
+    const step = steps[i];
+    const cmd = findCmd(step.cmdId);
+
+    addLog('INFO', `[${i+1}/${steps.length}] ${cmd.name}`);
+
+    try {
+      await simulateExecute(step, cmd, i);
+      step.status = 'done';
+      addLog('OK', `✓ 完成：${cmd.name}`);
+    } catch(err) {
+      step.status = 'error';
+      addLog('ERR', `✗ 錯誤：${err.message}`);
+      const errHandling = document.getElementById('errorHandling')?.value || 'stop';
+      if (errHandling === 'stop') {
+        addLog('ERR', '遇錯停止執行');
+        break;
+      }
+    }
+
+    renderSteps();
+    if (i < steps.length - 1) await sleep(delay);
+  }
+
+  finishExecution();
+}
+
+async function simulateExecute(step, cmd, idx) {
+  // Simulate MCP command execution
+  // In real deployment, these would call Chrome DevTools Protocol via MCP
+  const v = step.values;
+
+  switch (step.cmdId) {
+    case 'navigate':
+      if (!v.url) throw new Error('URL 不可為空');
+      addLog('INFO', `→ 導覽至 ${v.url}`);
+      await mcpCall('Page.navigate', { url: v.url });
+      break;
+    case 'click':
+      if (!v.selector) throw new Error('選擇器不可為空');
+      addLog('INFO', `→ 點擊 ${v.selector}`);
+      await mcpCall('Runtime.evaluate', { expression: `document.querySelector('${v.selector}').click()` });
+      break;
+    case 'dblclick':
+      if (!v.selector) throw new Error('選擇器不可為空');
+      addLog('INFO', `→ 雙擊 ${v.selector}`);
+      break;
+    case 'type':
+      if (!v.selector) throw new Error('選擇器不可為空');
+      addLog('INFO', `→ 輸入 "${v.value}" 到 ${v.selector}`);
+      await mcpCall('Runtime.evaluate', {
+        expression: `(function(){var el=document.querySelector('${v.selector}');if(!el)throw new Error('找不到元素');if('${v.clear}'==='true')el.value='';el.value+='${v.value}';el.dispatchEvent(new Event('input'));el.dispatchEvent(new Event('change'));})()`
+      });
+      break;
+    case 'wait':
+      const ms = parseInt(v.ms) || 1000;
+      addLog('INFO', `→ 等待 ${ms}ms`);
+      await sleep(ms);
+      break;
+    case 'wait_selector':
+      addLog('INFO', `→ 等待元素 ${v.selector} [${v.state||'visible'}]`);
+      await sleep(800);
+      break;
+    case 'screenshot':
+      addLog('INFO', `→ 截圖：${v.name || 'screenshot'}`);
+      await mcpCall('Page.captureScreenshot', { format: 'png', fullPage: v.full === 'true' });
+      break;
+    case 'js_eval':
+      addLog('INFO', `→ 執行 JS`);
+      const result = await mcpCall('Runtime.evaluate', { expression: v.code, returnByValue: true });
+      if (v.var && result) variables[v.var] = result;
+      break;
+    case 'extract_text':
+      addLog('INFO', `→ 擷取 ${v.selector} 的文字`);
+      const txt = await mcpCall('Runtime.evaluate', {
+        expression: `document.querySelector('${v.selector}')?.textContent || ''`
+      });
+      if (v.var) variables[v.var] = txt;
+      break;
+    case 'scroll':
+      addLog('INFO', `→ 捲動 ${v.direction} ${v.amount||''}px`);
+      const scrollMap = { down: `window.scrollBy(0,${v.amount||500})`, up: `window.scrollBy(0,-${v.amount||500})`, top: 'window.scrollTo(0,0)', bottom: 'window.scrollTo(0,document.body.scrollHeight)' };
+      await mcpCall('Runtime.evaluate', { expression: scrollMap[v.direction||'down'] });
+      break;
+    case 'reload':
+      addLog('INFO', `→ 重新整理頁面`);
+      await mcpCall('Page.reload', {});
+      break;
+    case 'key_press':
+      addLog('INFO', `→ 按下 ${v.key}`);
+      break;
+    case 'get_url':
+      addLog('INFO', `→ 取得目前 URL`);
+      if (v.var) variables[v.var] = window.location.href;
+      break;
+    case 'cookie_get':
+      addLog('INFO', `→ 取得 Cookie: ${v.name}`);
+      break;
+    case 'cookie_set':
+      addLog('INFO', `→ 設定 Cookie: ${v.name}=${v.value}`);
+      break;
+    case 'condition':
+      addLog('INFO', `→ 條件判斷 [${v.type}]: ${v.selector}`);
+      break;
+    case 'loop':
+      addLog('INFO', `→ 迴圈 ${v.times} 次`);
+      break;
+    default:
+      addLog('INFO', `→ 執行 ${cmd.name}`);
+      await sleep(300);
+  }
+}
+
+async function mcpCall(method, params) {
+  if (!mcpConnected) {
+    // Simulation mode
+    addLog('SYS', `[模擬] ${method}`);
+    await sleep(150 + Math.random()*200);
+    return { simulated: true };
+  }
+
+  return new Promise((resolve, reject) => {
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      reject(new Error('WebSocket 未連線'));
+      return;
+    }
+    const id = Date.now();
+    const msg = JSON.stringify({ id, method, params });
+    ws.send(msg);
+
+    const handler = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.id === id) {
+          ws.removeEventListener('message', handler);
+          if (data.error) reject(new Error(data.error.message));
+          else resolve(data.result);
+        }
+      } catch(e) {}
+    };
+    ws.addEventListener('message', handler);
+    setTimeout(() => { ws.removeEventListener('message', handler); reject(new Error('逾時')); }, 30000);
+  });
+}
+
+async function stepScript() {
+  if (!steps.length) return;
+  if (currentStepIdx >= steps.length - 1) {
+    currentStepIdx = -1;
+    steps.forEach(s => s.status = '');
+  }
+  currentStepIdx++;
+  const step = steps[currentStepIdx];
+  const cmd = findCmd(step.cmdId);
+  addLog('INFO', `[單步 ${currentStepIdx+1}/${steps.length}] ${cmd.name}`);
+  try {
+    await simulateExecute(step, cmd, currentStepIdx);
+    step.status = 'done';
+    addLog('OK', `✓ ${cmd.name}`);
+  } catch(err) {
+    step.status = 'error';
+    addLog('ERR', `✗ ${err.message}`);
+  }
+  updateProgress(currentStepIdx + 1, steps.length);
+  renderSteps();
+}
+
+function stopScript() {
+  shouldStop = true;
+  addLog('WARN', '⏸ 停止請求已發送...');
+}
+
+function finishExecution() {
+  isRunning = false;
+  currentStepIdx = -1;
+  document.getElementById('runBtn').style.display = '';
+  document.getElementById('stopBtn').style.display = 'none';
+  document.getElementById('runningIndicator').classList.remove('active');
+  setStatus('connected', 'MCP 已連線');
+  if (!mcpConnected) setStatus('idle', '模擬模式');
+  addLog('OK', '▣ 執行完成');
+  renderSteps();
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function updateProgress(cur, total) {
+  const pct = total ? Math.round((cur / total) * 100) : 0;
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('execInfo').textContent = `${cur}/${total} 步驟`;
+}
+
+// ═══════════════════════════════════════════
+//  MCP CONNECTION
+// ═══════════════════════════════════════════
+
+function connectMCP() {
+  const endpoint = document.getElementById('mcpEndpoint').value.trim();
+  if (!endpoint) { addLog('ERR', '請輸入 MCP 端點'); return; }
+
+  addLog('INFO', `嘗試連線 ${endpoint}...`);
+  setStatus('running', '連線中...');
+
+  try {
+    ws = new WebSocket(endpoint);
+
+    ws.onopen = () => {
+      mcpConnected = true;
+      setStatus('connected', 'MCP 已連線');
+      addLog('OK', `✓ 已連線：${endpoint}`);
+    };
+
+    ws.onerror = (e) => {
+      mcpConnected = false;
+      setStatus('error', '連線失敗');
+      addLog('ERR', `連線失敗 — 請確認 Chrome 已啟動除錯模式`);
+    };
+
+    ws.onclose = () => {
+      mcpConnected = false;
+      setStatus('idle', '已斷線');
+      addLog('WARN', 'WebSocket 連線已關閉');
+    };
+
+    ws.onmessage = (e) => {
+      // Handled per-request in mcpCall
+    };
+  } catch(err) {
+    addLog('ERR', `無法建立 WebSocket：${err.message}`);
+    setStatus('idle', '未連線');
+  }
+}
+
+function disconnectMCP() {
+  if (ws) { ws.close(); ws = null; }
+  mcpConnected = false;
+  setStatus('idle', '未連線');
+  addLog('SYS', '已手動斷線');
+}
+
+function testConnection() {
+  if (!mcpConnected) {
+    addLog('WARN', '未連線 MCP（將使用模擬模式）');
+    setStatus('idle', '模擬模式');
+    return;
+  }
+  addLog('INFO', '測試連線...');
+  mcpCall('Browser.getVersion', {}).then(r => {
+    addLog('OK', `✓ 連線正常`);
+  }).catch(e => {
+    addLog('ERR', `連線測試失敗：${e.message}`);
+  });
+}
+
+// ═══════════════════════════════════════════
+//  STATUS
+// ═══════════════════════════════════════════
+
+function setStatus(state, text) {
+  const dot = document.getElementById('statusDot');
+  const txt = document.getElementById('statusText');
+  dot.className = 'status-dot ' + state;
+  txt.textContent = text;
+}
+
+// ═══════════════════════════════════════════
+//  LOG
+// ═══════════════════════════════════════════
+
+function addLog(level, msg) {
+  const container = document.getElementById('logEntries');
+  const now = new Date();
+  const time = now.toTimeString().slice(0,8);
+  const el = document.createElement('div');
+  el.className = 'log-entry';
+  el.innerHTML = `
+    <span class="log-time">${time}</span>
+    <span class="log-level ${level}">${level}</span>
+    <span class="log-msg">${msg}</span>
+  `;
+  container.prepend(el);
+  if (container.children.length > 300) container.lastChild.remove();
+}
+
+function clearLog() {
+  document.getElementById('logEntries').innerHTML = '';
+  addLog('SYS', '日誌已清除');
+}
+
+// ═══════════════════════════════════════════
+//  SCRIPT LIBRARY
+// ═══════════════════════════════════════════
+
+function saveToLibrary() {
+  const name = document.getElementById('scriptName').value || '未命名腳本';
+  const entry = {
+    id: Date.now(),
+    name,
+    steps: JSON.parse(JSON.stringify(steps)),
+    created: new Date().toISOString()
+  };
+  scriptLibrary.unshift(entry);
+  localStorage.setItem('mcp_rpa_library', JSON.stringify(scriptLibrary));
+  renderScriptLibrary();
+  addLog('OK', `✓ 腳本已儲存：${name}`);
+}
+
+function loadFromLibrary(id) {
+  const entry = scriptLibrary.find(s => s.id === id);
+  if (!entry) return;
+  steps = JSON.parse(JSON.stringify(entry.steps));
+  document.getElementById('scriptName').value = entry.name;
+  renderSteps();
+  switchMainTab('editor');
+  addLog('INFO', `載入腳本：${entry.name}（${steps.length} 步）`);
+}
+
+function deleteFromLibrary(id) {
+  scriptLibrary = scriptLibrary.filter(s => s.id !== id);
+  localStorage.setItem('mcp_rpa_library', JSON.stringify(scriptLibrary));
+  renderScriptLibrary();
+}
+
+function renderScriptLibrary() {
+  const list = document.getElementById('scriptLibraryList');
+  if (!scriptLibrary.length) {
+    list.innerHTML = `<div class="empty-state"><div class="empty-icon">📂</div>腳本庫為空<br>儲存腳本後會顯示在這裡</div>`;
+    return;
+  }
+  list.innerHTML = scriptLibrary.map(s => `
+    <div class="script-item" onclick="loadFromLibrary(${s.id})">
+      <span>📄</span>
+      <div class="script-item-name">${s.name}</div>
+      <span class="script-item-count">${s.steps.length}步</span>
+      <button class="btn btn-sm btn-icon" onclick="event.stopPropagation();exportSingle(${s.id})" title="匯出">↓</button>
+      <button class="btn btn-sm btn-icon" onclick="event.stopPropagation();deleteFromLibrary(${s.id})" title="刪除" style="color:var(--red)">✕</button>
+    </div>
+  `).join('');
+}
+
+// ═══════════════════════════════════════════
+//  IMPORT / EXPORT
+// ═══════════════════════════════════════════
+
+function exportScript() {
+  const name = document.getElementById('scriptName').value || 'script';
+  const data = {
+    version: '1.0',
+    name,
+    steps: steps.map(s => ({ cmdId: s.cmdId, values: s.values })),
+    exported: new Date().toISOString(),
+    tool: 'MCP-RPA-Controller'
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = name.replace(/\s+/g,'_') + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  addLog('OK', `✓ 腳本已匯出：${name}.json`);
+}
+
+function exportSingle(id) {
+  const entry = scriptLibrary.find(s => s.id === id);
+  if (!entry) return;
+  const data = {
+    version: '1.0',
+    name: entry.name,
+    steps: entry.steps.map(s => ({ cmdId: s.cmdId, values: s.values })),
+    exported: new Date().toISOString()
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = entry.name.replace(/\s+/g,'_') + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  addLog('OK', `✓ 匯出：${entry.name}.json`);
+}
+
+function importScript() {
+  document.getElementById('importFileInput').click();
+}
+
+function handleImport(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!data.steps || !Array.isArray(data.steps)) throw new Error('格式錯誤');
+      steps = data.steps.map(s => ({
+        id: Date.now() + Math.random(),
+        cmdId: s.cmdId,
+        values: s.values || {}
+      }));
+      if (data.name) document.getElementById('scriptName').value = data.name;
+      renderSteps();
+      switchMainTab('editor');
+      addLog('OK', `✓ 匯入腳本：${data.name || file.name}（${steps.length} 步）`);
+    } catch(err) {
+      addLog('ERR', `匯入失敗：${err.message}`);
+    }
+    event.target.value = '';
+  };
+  reader.readAsText(file);
+}
+
+// ═══════════════════════════════════════════
+//  TABS & NAVIGATION
+// ═══════════════════════════════════════════
+
+function switchMainTab(name) {
+  document.querySelectorAll('.tab').forEach((t, i) => {
+    const names = ['editor','library','mcp'];
+    t.classList.toggle('active', names[i] === name);
+  });
+  document.querySelectorAll('.tab-content').forEach(c => {
+    c.classList.toggle('active', c.id === 'tab-' + name);
+  });
+}
+
+function mobileSwitch(panel, btn) {
+  document.querySelectorAll('.mobile-nav-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const panelCmds = document.querySelector('.panel-commands');
+  const panelCenter = document.querySelector('.app-shell > .panel:nth-child(2)');
+  const panelLog = document.querySelector('.panel-log');
+  if (panelCmds) panelCmds.style.display = panel === 'cmds' ? 'flex' : 'none';
+  if (panelCenter) panelCenter.style.display = panel === 'editor' ? 'flex' : 'none';
+  if (panelLog) panelLog.style.display = panel === 'log' ? 'flex' : 'none';
+}
+
+// ═══════════════════════════════════════════
+//  MODAL
+// ═══════════════════════════════════════════
+
+function openModal(id) {
+  document.getElementById(id).classList.add('open');
+  if (id === 'configModal') {
+    document.getElementById('modalStatus').textContent = mcpConnected ? '✓ 已連線' : '✗ 未連線（模擬模式）';
+  }
+}
+
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+}
+
+function applyConfig() {
+  const speed = document.getElementById('execSpeed').value;
+  document.getElementById('stepDelay').value = speed;
+  closeModal('configModal');
+  addLog('SYS', `設定已套用：延遲 ${speed}ms`);
+}
+
+document.querySelectorAll('.modal-overlay').forEach(o => {
+  o.addEventListener('click', e => { if (e.target === o) o.classList.remove('open'); });
+});
+
+// ═══════════════════════════════════════════
+//  BOOT
+// ═══════════════════════════════════════════
+init();
+</script>
+</body>
+</html>
