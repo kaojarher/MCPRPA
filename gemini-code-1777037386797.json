@@ -1,0 +1,49 @@
+{
+  "version": "1.0",
+  "name": "打開 Gemini 並自動問候",
+  "exported": "2026-04-24T13:30:00.000Z",
+  "tool": "MCP-RPA-Controller",
+  "steps": [
+    {
+      "cmdId": "navigate",
+      "values": {
+        "url": "https://gemini.google.com"
+      }
+    },
+    {
+      "cmdId": "wait_selector",
+      "values": {
+        "selector": ".ql-editor",
+        "state": "visible",
+        "timeout": "15000"
+      }
+    },
+    {
+      "cmdId": "wait",
+      "values": {
+        "ms": "2000"
+      }
+    },
+    {
+      "cmdId": "type",
+      "values": {
+        "selector": ".ql-editor",
+        "value": "你好 Gemini！這是一條來自 MCP RPA 控制器的自動測試訊息。",
+        "clear": "true"
+      }
+    },
+    {
+      "cmdId": "key_press",
+      "values": {
+        "key": "Enter"
+      }
+    },
+    {
+      "cmdId": "screenshot",
+      "values": {
+        "name": "gemini_opened",
+        "full": "false"
+      }
+    }
+  ]
+}
