@@ -1,4 +1,422 @@
-# MCP · RPA Controller — 三種執行模式完整說明
+# MCP · RPA Controller — Complete Guide to Three Execution Modes
+
+> Version: v2.0 All-in-One &nbsp;|&nbsp; File: `mcp-rpa-all-in-one.html`
+
+---
+
+## Table of Contents
+
+1. [Tool Overview](#tool-overview)
+2. [Mode A: Simulate Mode](#mode-a-simulate-mode)
+3. [Mode B: Extension Mode (Recommended)](#mode-b-extension-mode-recommended)
+4. [Mode C: CDP WebSocket Mode](#mode-c-cdp-websocket-mode)
+5. [Mode Comparison Table](#mode-comparison-table)
+6. [FAQ](#faq)
+
+---
+
+## Tool Overview
+
+`mcp-rpa-all-in-one.html` is a **single-file RPA design and execution tool** that includes:
+
+- Visual script editor with drag-and-drop step ordering
+- Built-in Gemini conversation script library (5 scripts)
+- Script import / export in JSON format
+- Three execution engines (Simulate / Extension / CDP)
+- Real-time execution log panel
+- Environment diagnostics tool
+
+**Basic workflow:**
+
+```
+Open HTML → Pick a script from the library → Load into editor → Select execution mode → ▶ Run
+```
+
+---
+
+## Mode A: Simulate Mode
+
+### Who it's for
+
+- First-time users who want to explore the tool without any setup
+- Designing and testing script logic without touching the browser
+- Anyone who does not want to install additional software or extensions
+
+### Capabilities
+
+| Feature | Details |
+|---------|---------|
+| Real browser control | ✗ Browser is not touched |
+| Installation required | ✓ None — open and use |
+| Screenshot download | ✗ Not supported |
+| Cookie operations | ✗ Not supported |
+| Best suited for | Script design, logic validation |
+
+### Getting Started
+
+**Step 1** — Open the tool
+
+Double-click `mcp-rpa-all-in-one.html` to open it in Chrome.
+
+**Step 2** — Load a script
+
+Click the **Script Library** tab at the top of the center panel → Under the **🤖 Built-in · Gemini Series** section, click any script, for example:
+
+```
+① Open Gemini and Send a Greeting
+```
+
+The script loads automatically into the editor, showing all steps.
+
+**Step 3** — Confirm execution mode
+
+Look at the three mode buttons in the bottom execution bar on the right side. Confirm that **⬡ Simulate is highlighted** — this is the default.
+
+```
+⬡ Simulate  ← should be highlighted in blue
+⬡ EXT
+⬡ CDP
+```
+
+**Step 4** — Run the script
+
+Click the **▶ Run** button on the bottom left and observe:
+
+- The right-side log panel shows each step's output in sequence
+- Each step card displays a **✓** in the top-right corner
+- The progress bar advances to 100%
+
+### Sample Simulate Mode Log
+
+```
+[10:23:41] INFO  ▶ Start: Open Gemini and Send a Greeting (8 steps) [simulate]
+[10:23:41] INFO  [1/8] → https://gemini.google.com
+[10:23:41] SYS   → Navigate https://gemini.google.com
+[10:23:41] INFO  [2/8] wait[visible] .ql-editor
+[10:23:42] OK    ✓ Done
+...
+[10:23:43] OK    ▣ Execution complete
+```
+
+> **Note:** In Simulate mode, Chrome performs no actual actions. All steps are recorded as log entries only — no real web page interaction takes place.
+
+---
+
+## Mode B: Extension Mode (Recommended)
+
+### Who it's for
+
+- Users who want scripts to **genuinely control Chrome**
+- Those who prefer not to configure a debugging port
+- **Best choice for beginners:** install once, then use effortlessly every time
+
+### Capabilities
+
+| Feature | Details |
+|---------|---------|
+| Real browser control | ✓ Fully real |
+| Installation required | One-time Chrome Extension install |
+| Debugging port required | ✗ Not needed |
+| Screenshot download | ✓ Auto-downloads as PNG |
+| Cookie operations | ✓ Full support |
+| Cross-site support | ✓ All websites |
+
+### Installation (One-Time Setup)
+
+**Step 1** — Download the Extension
+
+In the tool, switch to the **Extension Install** tab → click **⬇ Download Extension ZIP**.
+
+Alternatively, use the `mcp-rpa-extension.zip` file you already downloaded.
+
+**Step 2** — Unzip the file
+
+Extract the ZIP to a **permanent location** (e.g. a dedicated folder on your Desktop).
+
+```
+Desktop/
+└── mcp-rpa-extension/
+    ├── manifest.json
+    ├── background.js
+    ├── content.js
+    ├── popup.html
+    └── icons/
+```
+
+> ⚠️ **Important:** Do **not** move or rename this folder after installation. If you do, the Extension will break and must be reloaded from the new location.
+
+**Step 3** — Open Chrome's Extension management page
+
+Type the following into the Chrome address bar:
+
+```
+chrome://extensions/
+```
+
+**Step 4** — Enable Developer Mode
+
+Toggle the **Developer mode** switch in the **top-right corner** of the page to **On** (it turns blue).
+
+**Step 5** — Load the Extension
+
+Click **Load unpacked** in the top-left → select the folder you extracted in Step 2 (select the entire folder, not an individual file inside it).
+
+**Step 6** — Confirm successful installation
+
+A **hexagonal ⬡ icon** appears in the Chrome toolbar — installation is complete.
+
+```
+[Chrome Toolbar] ... ⬡ ...
+```
+
+### Daily Usage
+
+**Step 1** — Open the tool and detect the Extension
+
+Open `mcp-rpa-all-in-one.html` in Chrome → click **⬡ EXT** at the bottom → click **◎ Detect Extension**.
+
+The following message in the log confirms a successful connection:
+
+```
+[10:25:01] OK    ✓ Extension is ready
+```
+
+**Step 2** — Load a script
+
+Go to **Script Library** → click **① Open Gemini and Send a Greeting**.
+
+**Step 3** — Run
+
+Confirm **⬡ EXT** is highlighted at the bottom → click **▶ Run** → watch Chrome automate Gemini in real time.
+
+### How Extension Mode Works
+
+```
+mcp-rpa-all-in-one.html
+        │
+        │  postMessage (MCP_RPA_EXEC)
+        ▼
+content.js  (injected into every page)
+        │
+        │  chrome.runtime.sendMessage
+        ▼
+background.js  (Service Worker)
+        │
+        │  chrome.scripting / chrome.tabs API
+        ▼
+Chrome tab  (real web page being automated)
+```
+
+### Full Command Reference
+
+| Category | Commands |
+|----------|----------|
+| Navigation | `navigate`, `reload`, `back`, `forward`, `tab_new`, `tab_close` |
+| Interaction | `click`, `dblclick`, `hover`, `type`, `select`, `key_press` |
+| Scrolling | `scroll`, `scroll_to` |
+| Waiting | `wait`, `wait_selector`, `wait_url` |
+| Extraction | `extract_text`, `extract_attr`, `get_url` |
+| Screenshot | `screenshot` (auto-downloads PNG) |
+| JavaScript | `js_eval`, `js_inject` |
+| Cookie / Storage | `cookie_get`, `cookie_set`, `storage_get` |
+| Logic | `condition`, `loop` |
+
+---
+
+## Mode C: CDP WebSocket Mode
+
+### Who it's for
+
+- Advanced users who need fine-grained control via Chrome DevTools Protocol
+- Developers comfortable with command-line tools
+- Users who need screenshots or full browser control without installing an Extension
+
+### Capabilities
+
+| Feature | Details |
+|---------|---------|
+| Real browser control | ✓ Fully real |
+| Installation required | ✗ No Extension needed |
+| Debugging port required | ✓ Must pass flag every time Chrome launches |
+| Screenshot download | ✓ Auto-downloads PNG |
+| Cookie operations | △ Partial (requires JS workaround) |
+| Cross-site support | ✓ Full support |
+
+### Setup Steps
+
+**Step 1** — Fully close Chrome
+
+Make sure every Chrome window — including background processes — is closed.
+
+```bash
+# Windows (Command Prompt)
+taskkill /F /IM chrome.exe /T
+
+# macOS (Terminal)
+pkill -9 "Google Chrome"
+```
+
+**Step 2** — Launch Chrome in debug mode
+
+Run the command for your operating system:
+
+**Windows:**
+
+```bash
+"C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222
+```
+
+Or press **Win + R** and type:
+
+```
+chrome.exe --remote-debugging-port=9222
+```
+
+**macOS:**
+
+```bash
+/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --remote-debugging-port=9222
+```
+
+**Linux:**
+
+```bash
+google-chrome --remote-debugging-port=9222
+```
+
+> ⚠️ **Important:** Chrome must be fully closed before running the command above. If Chrome is already running, the `--remote-debugging-port` flag is silently ignored and the debugging port will not open.
+
+**Step 3** — Verify the debugging port is active
+
+In the Chrome window you just launched, navigate to:
+
+```
+http://localhost:9222/json/version
+```
+
+If you see a JSON response similar to the following, you're good to go:
+
+```json
+{
+  "Browser": "Chrome/124.0.0.0",
+  "Protocol-Version": "1.3",
+  "webSocketDebuggerUrl": "ws://localhost:9222/devtools/browser/..."
+}
+```
+
+If the page fails to load, return to Step 1 and try again.
+
+**Step 4** — Run the environment diagnostics
+
+In the tool, switch to the **MCP Settings** tab → click **▶ Run Diagnostics**.
+
+All items should show a green ✓ before proceeding:
+
+```
+✓  Chrome port :9222    Ready · Chrome/124.0.0.0
+✓  Controllable tabs    3 found
+→  Current tab          New Tab
+★  Next step            Click "Connect CDP" → select CDP mode → Run
+```
+
+**Step 5** — Connect to CDP
+
+Click **⬡ Connect CDP**. The status indicator changes to:
+
+```
+● CDP Connected
+```
+
+**Step 6** — Switch mode and run
+
+Click **⬡ CDP** at the bottom → load a script → click **▶ Run**.
+
+### CDP Mode Troubleshooting
+
+**Q: "WebSocket not connected" error during execution**
+
+Confirm Chrome was launched with the debug flag. Visit `http://localhost:9222/json/version` again to verify the port is open.
+
+**Q: The connection drops after a while**
+
+CDP connections close when Chrome is shut down or the user switches profiles. Relaunch Chrome in debug mode and click **⬡ Connect CDP** again to reconnect.
+
+**Q: Chrome shows an account selection screen on startup**
+
+This is normal when launching with a fresh profile. Simply select an account to proceed — the account selection does not affect the debugging port.
+
+---
+
+## Mode Comparison Table
+
+| Feature | ⬡ Simulate | ⬡ EXT (Recommended) | ⬡ CDP |
+|---------|:---------:|:-------------------:|:-----:|
+| Real browser control | ✗ | ✓ | ✓ |
+| Extension install required | ✗ | ✓ (one-time) | ✗ |
+| Debugging port required | ✗ | ✗ | ✓ |
+| Screenshot download | ✗ | ✓ | ✓ |
+| Full Cookie support | ✗ | ✓ | △ |
+| Cross-site automation | ✗ | ✓ | ✓ |
+| Difficulty | Easiest | Easy | Intermediate |
+| Best for | Script design | Daily automation | Advanced development |
+
+---
+
+## FAQ
+
+### General
+
+**Q: Can I use the HTML tool offline?**
+
+Yes. The tool itself requires no internet connection. Google Fonts will not load offline, but this only affects the font appearance — all functionality works normally.
+
+**Q: Are scripts saved automatically?**
+
+The script library uses the browser's `localStorage`. It persists across sessions but is cleared if you clear browser data. Export your scripts regularly using the **↓ Export** button to keep JSON backups.
+
+**Q: Can I use this in Edge or Firefox?**
+
+Extension mode is only supported in Chromium-based browsers (Chrome, Edge, Brave). Simulate mode and CDP mode work in all modern browsers.
+
+**Q: The `.ql-editor` selector for Gemini stopped working. What do I do?**
+
+Google may update Gemini's HTML structure over time. Open Chrome DevTools (F12), inspect the input field, find its current CSS selector, and update the step card in the editor accordingly.
+
+---
+
+### Extension Mode
+
+**Q: "◎ Detect Extension" always shows "not detected"**
+
+Check the following:
+
+1. The Extension is actually loaded in `chrome://extensions/` (look for the hexagonal ⬡ icon in the toolbar)
+2. The HTML tool is opened in **the same Chrome browser** where the Extension is installed
+3. Try refreshing the HTML tool page, then click **Detect Extension** again
+
+**Q: Can I move the Extension folder after installation?**
+
+No. Moving or renaming the folder breaks the Extension and causes an error badge on the icon. To fix it, remove the broken entry in `chrome://extensions/`, then click **Load unpacked** again pointing to the new folder path.
+
+---
+
+### CDP Mode
+
+**Q: `localhost:9222` is unreachable even though Chrome is open**
+
+The most common cause is a **lingering Chrome background process** that was already running before you launched the debug command. Use Task Manager (Windows) or Activity Monitor (macOS) to confirm all Chrome processes are terminated, then rerun the debug launch command.
+
+**Q: Do I have to type the launch command every time?**
+
+No — create a **desktop shortcut**:
+
+- **Windows:** Right-click the Chrome shortcut → Properties → append ` --remote-debugging-port=9222` to the end of the **Target** field → OK. Use this shortcut to launch Chrome.
+- **macOS:** Create a small shell script or use Automator to wrap the Terminal command, then save it as an application on your Desktop.
+
+---
+
+*MCP · RPA Controller v2.0 All-in-One*  
+*Documentation version: April 2026*# MCP · RPA Controller — 三種執行模式完整說明
 
 > 版本：v2.0 All-in-One｜適用檔案：`mcp-rpa-all-in-one.html`
 
