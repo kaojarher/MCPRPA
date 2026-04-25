@@ -682,54 +682,240 @@ const COMMANDS = [
 ];
 
 const BUILTIN_SCRIPTS = [
-  { id:'b1', name:'① 打開 Gemini 並問候', icon:'🤖', steps:[
-    {cmdId:'navigate',      values:{url:'https://gemini.google.com'}},
-    {cmdId:'wait_selector', values:{selector:'.ql-editor',state:'visible',timeout:'15000'}},
+
+  // ── GEMINI 系列 ──────────────────────────────
+  { id:'b1', name:'① Gemini：開啟並問候', icon:'🤖', group:'gemini', steps:[
+    // 修正：用新分頁開啟，不覆蓋目前頁面
+    {cmdId:'tab_new',       values:{url:'https://gemini.google.com'}},
+    // 等待登入後輸入框出現（最多 20 秒）
+    {cmdId:'wait_selector', values:{selector:'.ql-editor, [contenteditable="true"]',state:'visible',timeout:'20000'}},
     {cmdId:'wait',          values:{ms:'2000'}},
-    {cmdId:'click',         values:{selector:'.ql-editor',button:'left'}},
-    {cmdId:'type',          values:{selector:'.ql-editor',value:'你好 Gemini！這是來自 MCP RPA 控制器的自動測試訊息，請簡短回覆。',clear:'true'}},
-    {cmdId:'key_press',     values:{key:'Enter'}},
-    {cmdId:'wait',          values:{ms:'5000'}},
-    {cmdId:'screenshot',    values:{name:'gemini_greeting',full:'false'}},
-  ]},
-  { id:'b2', name:'② Gemini 自動提問', icon:'💬', steps:[
-    {cmdId:'wait_selector', values:{selector:'.ql-editor',state:'visible',timeout:'10000'}},
-    {cmdId:'click',         values:{selector:'.ql-editor',button:'left'}},
-    {cmdId:'type',          values:{selector:'.ql-editor',value:'請用繁體中文解釋：什麼是 MCP（Model Context Protocol）？',clear:'true'}},
+    {cmdId:'click',         values:{selector:'.ql-editor, [contenteditable="true"]',button:'left'}},
+    {cmdId:'type',          values:{selector:'.ql-editor, [contenteditable="true"]',value:'你好 Gemini！這是來自 MCP RPA 控制器的自動測試訊息，請簡短回覆。',clear:'true'}},
     {cmdId:'wait',          values:{ms:'500'}},
     {cmdId:'key_press',     values:{key:'Enter'}},
-    {cmdId:'wait',          values:{ms:'5000'}},
+    {cmdId:'wait',          values:{ms:'6000'}},
     {cmdId:'scroll',        values:{direction:'bottom',amount:''}},
-    {cmdId:'screenshot',    values:{name:'gemini_answer',full:'true'}},
+    {cmdId:'screenshot',    values:{name:'gemini_greeting_{timestamp}',full:'false'}},
   ]},
-  { id:'b3', name:'③ Gemini 開新對話', icon:'🔄', steps:[
-    {cmdId:'navigate',      values:{url:'https://gemini.google.com'}},
-    {cmdId:'wait',          values:{ms:'3000'}},
-    {cmdId:'wait_selector', values:{selector:'.ql-editor',state:'visible',timeout:'15000'}},
-    {cmdId:'screenshot',    values:{name:'gemini_newchat_ready',full:'false'}},
-  ]},
-  { id:'b4', name:'④ 擷取 Gemini 回覆', icon:'📋', steps:[
-    {cmdId:'wait_selector', values:{selector:'model-response',state:'visible',timeout:'15000'}},
-    {cmdId:'scroll',        values:{direction:'bottom',amount:''}},
-    {cmdId:'wait',          values:{ms:'1000'}},
-    {cmdId:'extract_text',  values:{selector:'model-response:last-child',var:'geminiReply'}},
-    {cmdId:'screenshot',    values:{name:'gemini_extracted',full:'false'}},
-  ]},
-  { id:'b5', name:'⑤ 多輪對話流程', icon:'🗣', steps:[
-    {cmdId:'navigate',      values:{url:'https://gemini.google.com'}},
-    {cmdId:'wait_selector', values:{selector:'.ql-editor',state:'visible',timeout:'15000'}},
+
+  { id:'b2', name:'② Gemini：自動提問 MCP', icon:'💬', group:'gemini', steps:[
+    // 從新分頁開啟，確保頁面就緒再輸入
+    {cmdId:'tab_new',       values:{url:'https://gemini.google.com'}},
+    {cmdId:'wait_selector', values:{selector:'.ql-editor, [contenteditable="true"]',state:'visible',timeout:'20000'}},
     {cmdId:'wait',          values:{ms:'2000'}},
-    {cmdId:'click',         values:{selector:'.ql-editor',button:'left'}},
-    {cmdId:'type',          values:{selector:'.ql-editor',value:'請列出 3 個 AI 在日常生活中的應用例子。',clear:'true'}},
+    {cmdId:'click',         values:{selector:'.ql-editor, [contenteditable="true"]',button:'left'}},
+    {cmdId:'type',          values:{selector:'.ql-editor, [contenteditable="true"]',value:'請用繁體中文解釋：什麼是 MCP（Model Context Protocol）？並舉一個實際應用例子。',clear:'true'}},
+    {cmdId:'wait',          values:{ms:'500'}},
     {cmdId:'key_press',     values:{key:'Enter'}},
-    {cmdId:'wait',          values:{ms:'6000'}},
-    {cmdId:'click',         values:{selector:'.ql-editor',button:'left'}},
-    {cmdId:'type',          values:{selector:'.ql-editor',value:'針對你提到的第一個例子，請再深入說明。',clear:'true'}},
+    {cmdId:'wait',          values:{ms:'8000'}},
+    {cmdId:'scroll',        values:{direction:'bottom',amount:''}},
+    {cmdId:'screenshot',    values:{name:'gemini_mcp_answer_{timestamp}',full:'true'}},
+  ]},
+
+  { id:'b3', name:'③ Gemini：擷取最新回覆', icon:'📋', group:'gemini', steps:[
+    // 開新分頁、問問題、等回覆、擷取文字
+    {cmdId:'tab_new',       values:{url:'https://gemini.google.com'}},
+    {cmdId:'wait_selector', values:{selector:'.ql-editor, [contenteditable="true"]',state:'visible',timeout:'20000'}},
+    {cmdId:'wait',          values:{ms:'2000'}},
+    {cmdId:'click',         values:{selector:'.ql-editor, [contenteditable="true"]',button:'left'}},
+    {cmdId:'type',          values:{selector:'.ql-editor, [contenteditable="true"]',value:'請用一句話介紹你自己。',clear:'true'}},
     {cmdId:'key_press',     values:{key:'Enter'}},
     {cmdId:'wait',          values:{ms:'6000'}},
     {cmdId:'scroll',        values:{direction:'bottom',amount:''}},
-    {cmdId:'screenshot',    values:{name:'gemini_multi_round',full:'true'}},
+    // 嘗試多種可能的回覆容器選擇器
+    {cmdId:'wait_selector', values:{selector:'model-response, .response-container, [data-response-index]',state:'visible',timeout:'15000'}},
+    {cmdId:'extract_text',  values:{selector:'model-response:last-child, .response-container:last-child',var:'geminiReply'}},
+    {cmdId:'screenshot',    values:{name:'gemini_reply_{timestamp}',full:'false'}},
   ]},
+
+  { id:'b4', name:'④ Gemini：多輪對話', icon:'🗣', group:'gemini', steps:[
+    {cmdId:'tab_new',       values:{url:'https://gemini.google.com'}},
+    {cmdId:'wait_selector', values:{selector:'.ql-editor, [contenteditable="true"]',state:'visible',timeout:'20000'}},
+    {cmdId:'wait',          values:{ms:'2000'}},
+    // 第一輪
+    {cmdId:'click',         values:{selector:'.ql-editor, [contenteditable="true"]',button:'left'}},
+    {cmdId:'type',          values:{selector:'.ql-editor, [contenteditable="true"]',value:'請列出 3 個 AI 在日常生活的應用，用條列式回答。',clear:'true'}},
+    {cmdId:'key_press',     values:{key:'Enter'}},
+    {cmdId:'wait',          values:{ms:'7000'}},
+    {cmdId:'scroll',        values:{direction:'bottom',amount:''}},
+    // 第二輪
+    {cmdId:'click',         values:{selector:'.ql-editor, [contenteditable="true"]',button:'left'}},
+    {cmdId:'type',          values:{selector:'.ql-editor, [contenteditable="true"]',value:'針對第 1 點，請再深入說明並舉一個台灣的實例。',clear:'true'}},
+    {cmdId:'key_press',     values:{key:'Enter'}},
+    {cmdId:'wait',          values:{ms:'7000'}},
+    {cmdId:'scroll',        values:{direction:'bottom',amount:''}},
+    {cmdId:'screenshot',    values:{name:'gemini_multi_{timestamp}',full:'true'}},
+  ]},
+
+  { id:'b5', name:'⑤ Gemini：翻譯任務', icon:'🌐', group:'gemini', steps:[
+    {cmdId:'tab_new',       values:{url:'https://gemini.google.com'}},
+    {cmdId:'wait_selector', values:{selector:'.ql-editor, [contenteditable="true"]',state:'visible',timeout:'20000'}},
+    {cmdId:'wait',          values:{ms:'2000'}},
+    {cmdId:'click',         values:{selector:'.ql-editor, [contenteditable="true"]',button:'left'}},
+    {cmdId:'type',          values:{selector:'.ql-editor, [contenteditable="true"]',value:'請將以下中文翻譯成英文、日文、韓文三種語言，並以表格呈現：\n「人工智慧正在改變我們的生活方式。」',clear:'true'}},
+    {cmdId:'key_press',     values:{key:'Enter'}},
+    {cmdId:'wait',          values:{ms:'7000'}},
+    {cmdId:'scroll',        values:{direction:'bottom',amount:''}},
+    {cmdId:'screenshot',    values:{name:'gemini_translate_{timestamp}',full:'true'}},
+  ]},
+
+  // ── GOOGLE SEARCH 系列 ───────────────────────
+  { id:'g1', name:'⑥ Google Search：關鍵字搜尋', icon:'🔍', group:'google', steps:[
+    {cmdId:'tab_new',       values:{url:'https://www.google.com'}},
+    {cmdId:'wait_selector', values:{selector:'textarea[name="q"], input[name="q"]',state:'visible',timeout:'10000'}},
+    {cmdId:'click',         values:{selector:'textarea[name="q"], input[name="q"]',button:'left'}},
+    {cmdId:'type',          values:{selector:'textarea[name="q"], input[name="q"]',value:'MCP Model Context Protocol AI',clear:'true'}},
+    {cmdId:'key_press',     values:{key:'Enter'}},
+    {cmdId:'wait_selector', values:{selector:'#search, #rso',state:'visible',timeout:'10000'}},
+    {cmdId:'screenshot',    values:{name:'google_search_{timestamp}',full:'false'}},
+    // 擷取第一筆結果標題
+    {cmdId:'extract_text',  values:{selector:'#search .g:first-child h3, #rso .g:first-child h3',var:'firstResult'}},
+  ]},
+
+  { id:'g2', name:'⑦ Google Search：搜尋並開第一個結果', icon:'🌏', group:'google', steps:[
+    {cmdId:'tab_new',       values:{url:'https://www.google.com'}},
+    {cmdId:'wait_selector', values:{selector:'textarea[name="q"], input[name="q"]',state:'visible',timeout:'10000'}},
+    {cmdId:'click',         values:{selector:'textarea[name="q"], input[name="q"]',button:'left'}},
+    {cmdId:'type',          values:{selector:'textarea[name="q"], input[name="q"]',value:'Anthropic Claude AI',clear:'true'}},
+    {cmdId:'key_press',     values:{key:'Enter'}},
+    {cmdId:'wait_selector', values:{selector:'#search .g h3, #rso .g h3',state:'visible',timeout:'10000'}},
+    {cmdId:'wait',          values:{ms:'1000'}},
+    // 點擊第一個搜尋結果
+    {cmdId:'click',         values:{selector:'#search .g:first-child a, #rso .g:first-child a',button:'left'}},
+    {cmdId:'wait',          values:{ms:'3000'}},
+    {cmdId:'get_url',       values:{var:'landedUrl'}},
+    {cmdId:'screenshot',    values:{name:'google_first_result_{timestamp}',full:'false'}},
+  ]},
+
+  { id:'g3', name:'⑧ Google Search：圖片搜尋截圖', icon:'🖼', group:'google', steps:[
+    {cmdId:'tab_new',       values:{url:'https://www.google.com/search?tbm=isch&q=Taiwan+scenery'}},
+    {cmdId:'wait_selector', values:{selector:'#islrg, [data-ved] img',state:'visible',timeout:'10000'}},
+    {cmdId:'wait',          values:{ms:'2000'}},
+    {cmdId:'scroll',        values:{direction:'down',amount:'400'}},
+    {cmdId:'screenshot',    values:{name:'google_images_{timestamp}',full:'false'}},
+    // 點擊第一張圖片
+    {cmdId:'click',         values:{selector:'#islrg .isv-r:first-child, [data-ved] img',button:'left'}},
+    {cmdId:'wait',          values:{ms:'2000'}},
+    {cmdId:'screenshot',    values:{name:'google_image_detail_{timestamp}',full:'false'}},
+  ]},
+
+  // ── GOOGLE MAPS 系列 ────────────────────────
+  { id:'m1', name:'⑨ Google Maps：搜尋地點', icon:'📍', group:'maps', steps:[
+    {cmdId:'tab_new',       values:{url:'https://www.google.com/maps'}},
+    {cmdId:'wait_selector', values:{selector:'#searchboxinput, input[aria-label="搜尋 Google 地圖"], input[placeholder]',state:'visible',timeout:'15000'}},
+    {cmdId:'wait',          values:{ms:'2000'}},
+    {cmdId:'click',         values:{selector:'#searchboxinput, input[aria-label*="搜尋"], input[id*="search"]',button:'left'}},
+    {cmdId:'type',          values:{selector:'#searchboxinput, input[aria-label*="搜尋"], input[id*="search"]',value:'台南市美食',clear:'true'}},
+    {cmdId:'key_press',     values:{key:'Enter'}},
+    {cmdId:'wait',          values:{ms:'4000'}},
+    {cmdId:'screenshot',    values:{name:'gmap_search_{timestamp}',full:'false'}},
+  ]},
+
+  { id:'m2', name:'⑩ Google Maps：查詢路線', icon:'🗺', group:'maps', steps:[
+    {cmdId:'tab_new',       values:{url:'https://www.google.com/maps/dir/台北車站/台南車站'}},
+    {cmdId:'wait_selector', values:{selector:'#directions-searchbox-0, .section-directions-trip',state:'visible',timeout:'20000'}},
+    {cmdId:'wait',          values:{ms:'4000'}},
+    {cmdId:'screenshot',    values:{name:'gmap_route_{timestamp}',full:'false'}},
+    // 擷取路線時間
+    {cmdId:'extract_text',  values:{selector:'.section-directions-trip-duration, [data-value]',var:'routeTime'}},
+  ]},
+
+  { id:'m3', name:'⑪ Google Maps：查看附近餐廳', icon:'🍽', group:'maps', steps:[
+    {cmdId:'tab_new',       values:{url:'https://www.google.com/maps/search/restaurants+near+me'}},
+    {cmdId:'wait_selector', values:{selector:'.section-result, [role="article"]',state:'visible',timeout:'20000'}},
+    {cmdId:'wait',          values:{ms:'3000'}},
+    {cmdId:'screenshot',    values:{name:'gmap_restaurants_{timestamp}',full:'false'}},
+    // 點第一個結果
+    {cmdId:'click',         values:{selector:'.section-result:first-child, [role="article"]:first-child',button:'left'}},
+    {cmdId:'wait',          values:{ms:'2000'}},
+    {cmdId:'screenshot',    values:{name:'gmap_restaurant_detail_{timestamp}',full:'false'}},
+  ]},
+
+  // ── GOOGLE DOCS 系列 ────────────────────────
+  { id:'d1', name:'⑫ Google Docs：開新文件', icon:'📄', group:'docs', steps:[
+    {cmdId:'tab_new',       values:{url:'https://docs.new'}},
+    // docs.new 自動建立新文件並跳轉，等待編輯器出現
+    {cmdId:'wait_selector', values:{selector:'.docs-title-input, #docs-editor, .kix-appview-editor',state:'visible',timeout:'20000'}},
+    {cmdId:'wait',          values:{ms:'2000'}},
+    {cmdId:'screenshot',    values:{name:'gdoc_new_{timestamp}',full:'false'}},
+    // 點擊標題並輸入
+    {cmdId:'click',         values:{selector:'.docs-title-input',button:'left'}},
+    {cmdId:'type',          values:{selector:'.docs-title-input',value:'MCP RPA 自動化測試文件',clear:'true'}},
+    {cmdId:'wait',          values:{ms:'800'}},
+    // 點擊內文區域並輸入
+    {cmdId:'click',         values:{selector:'.docs-editor-container, #docs-editor',button:'left'}},
+    {cmdId:'wait',          values:{ms:'500'}},
+    {cmdId:'key_press',     values:{key:'Enter'}},
+    {cmdId:'js_eval',       values:{code:`
+      // 在 Docs 中插入文字需透過鍵盤事件
+      const text = '本文件由 MCP RPA Controller 自動建立。\n建立時間：' + new Date().toLocaleString('zh-TW');
+      document.execCommand('insertText', false, text);
+      return true;
+    `,var:'typed'}},
+    {cmdId:'wait',          values:{ms:'1000'}},
+    {cmdId:'screenshot',    values:{name:'gdoc_typed_{timestamp}',full:'false'}},
+  ]},
+
+  { id:'d2', name:'⑬ Google Docs：開啟最近文件', icon:'📂', group:'docs', steps:[
+    {cmdId:'tab_new',       values:{url:'https://docs.google.com/document/u/0/'}},
+    {cmdId:'wait_selector', values:{selector:'.docs-homescreen-gb-container, .doclist-flat-document-item, [data-item-id]',state:'visible',timeout:'15000'}},
+    {cmdId:'wait',          values:{ms:'2000'}},
+    {cmdId:'screenshot',    values:{name:'gdoc_list_{timestamp}',full:'false'}},
+    // 擷取第一個文件標題
+    {cmdId:'extract_text',  values:{selector:'.docs-homescreen-gb-container .docs-homescreen-gb-name:first-child, .doclist-flat-document-item:first-child .doclist-flat-document-item-title',var:'firstDocTitle'}},
+  ]},
+
+  // ── YOUTUBE 系列 ────────────────────────────
+  { id:'y1', name:'⑭ YouTube：搜尋影片', icon:'▶', group:'youtube', steps:[
+    {cmdId:'tab_new',       values:{url:'https://www.youtube.com'}},
+    {cmdId:'wait_selector', values:{selector:'#search-input input, input#search',state:'visible',timeout:'10000'}},
+    {cmdId:'wait',          values:{ms:'1500'}},
+    {cmdId:'click',         values:{selector:'#search-input input, input#search',button:'left'}},
+    {cmdId:'type',          values:{selector:'#search-input input, input#search',value:'MCP Model Context Protocol tutorial',clear:'true'}},
+    {cmdId:'key_press',     values:{key:'Enter'}},
+    {cmdId:'wait_selector', values:{selector:'ytd-video-renderer, #contents ytd-item-section-renderer',state:'visible',timeout:'10000'}},
+    {cmdId:'wait',          values:{ms:'2000'}},
+    {cmdId:'screenshot',    values:{name:'youtube_search_{timestamp}',full:'false'}},
+    // 擷取第一個影片標題
+    {cmdId:'extract_text',  values:{selector:'ytd-video-renderer:first-child #video-title, ytd-video-renderer:first-child h3',var:'firstVideoTitle'}},
+  ]},
+
+  { id:'y2', name:'⑮ YouTube：播放第一個結果', icon:'🎬', group:'youtube', steps:[
+    {cmdId:'tab_new',       values:{url:'https://www.youtube.com'}},
+    {cmdId:'wait_selector', values:{selector:'#search-input input, input#search',state:'visible',timeout:'10000'}},
+    {cmdId:'wait',          values:{ms:'1500'}},
+    {cmdId:'click',         values:{selector:'#search-input input, input#search',button:'left'}},
+    {cmdId:'type',          values:{selector:'#search-input input, input#search',value:'lofi music study',clear:'true'}},
+    {cmdId:'key_press',     values:{key:'Enter'}},
+    {cmdId:'wait_selector', values:{selector:'ytd-video-renderer',state:'visible',timeout:'10000'}},
+    {cmdId:'wait',          values:{ms:'2000'}},
+    // 點擊第一個影片縮圖
+    {cmdId:'click',         values:{selector:'ytd-video-renderer:first-child ytd-thumbnail, ytd-video-renderer:first-child a#thumbnail',button:'left'}},
+    {cmdId:'wait_selector', values:{selector:'video.html5-main-video, #movie_player',state:'visible',timeout:'15000'}},
+    {cmdId:'wait',          values:{ms:'3000'}},
+    {cmdId:'screenshot',    values:{name:'youtube_playing_{timestamp}',full:'false'}},
+    // 擷取影片標題
+    {cmdId:'extract_text',  values:{selector:'h1.ytd-watch-metadata, #title h1',var:'videoTitle'}},
+  ]},
+
+  { id:'y3', name:'⑯ YouTube：靜音並截圖', icon:'🔇', group:'youtube', steps:[
+    // 適合接在 ⑮ 之後；若已在播放頁可直接執行
+    {cmdId:'wait_selector', values:{selector:'video.html5-main-video, #movie_player',state:'visible',timeout:'10000'}},
+    // 用 JS 靜音
+    {cmdId:'js_eval',       values:{code:`
+      const v = document.querySelector('video.html5-main-video');
+      if(v){ v.muted = true; return 'muted'; }
+      return 'video not found';
+    `,var:'muteResult'}},
+    {cmdId:'wait',          values:{ms:'1000'}},
+    {cmdId:'screenshot',    values:{name:'youtube_muted_{timestamp}',full:'false'}},
+    // 捲動到留言區
+    {cmdId:'scroll',        values:{direction:'bottom',amount:'800'}},
+    {cmdId:'wait',          values:{ms:'1500'}},
+    {cmdId:'screenshot',    values:{name:'youtube_comments_{timestamp}',full:'true'}},
+  ]},
+
 ];
 
 // ═══════════════════════════════════════════
@@ -1449,14 +1635,28 @@ function b64ToBytes(b64){ const bin=atob(b64); const b=new Uint8Array(bin.length
 // ═══════════════════════════════════════════
 
 function renderBuiltins(){
-  document.getElementById('builtinList').innerHTML = BUILTIN_SCRIPTS.map(s=>
-    `<div class="lib-item" onclick="loadScript(${JSON.stringify(JSON.stringify(s))})">
-      <span>${s.icon}</span>
-      <span class="lib-name">${s.name}</span>
-      <span class="lib-count">${s.steps.length}步</span>
-      <button class="btn sm ico" onclick="event.stopPropagation();exportBuiltin('${s.id}')" data-tip="匯出">↓</button>
-    </div>`
-  ).join('');
+  const groups = [
+    { key:'gemini',  label:'🤖 Gemini 對話系列' },
+    { key:'google',  label:'🔍 Google Search 系列' },
+    { key:'maps',    label:'📍 Google Maps 系列' },
+    { key:'docs',    label:'📄 Google Docs 系列' },
+    { key:'youtube', label:'▶ YouTube 系列' },
+  ];
+  let html = '';
+  groups.forEach(g => {
+    const items = BUILTIN_SCRIPTS.filter(s => s.group === g.key);
+    if (!items.length) return;
+    html += `<div class="g-label" style="padding-top:6px;margin-top:4px">${g.label}</div>`;
+    html += items.map(s =>
+      `<div class="lib-item" onclick="loadScript(${JSON.stringify(JSON.stringify(s))})">
+        <span>${s.icon}</span>
+        <span class="lib-name">${s.name}</span>
+        <span class="lib-count">${s.steps.length}步</span>
+        <button class="btn sm ico" onclick="event.stopPropagation();exportBuiltin('${s.id}')" data-tip="匯出 JSON">↓</button>
+      </div>`
+    ).join('');
+  });
+  document.getElementById('builtinList').innerHTML = html;
 }
 
 function renderUserLib(){
