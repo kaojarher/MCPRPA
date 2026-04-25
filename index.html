@@ -3,1873 +3,1714 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MCP · Chrome RPA Controller</title>
+<title>MCP · RPA Controller — All-in-One</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --bg: #0a0b0e;
-    --surface: #111318;
-    --surface2: #181c24;
-    --border: #252932;
-    --border2: #2e3440;
-    --accent: #00d4ff;
-    --accent2: #0088aa;
-    --green: #00ff88;
-    --red: #ff4455;
-    --yellow: #ffcc00;
-    --orange: #ff8800;
-    --text: #e0e6f0;
-    --text2: #8892a0;
-    --text3: #4a5568;
-    --mono: 'IBM Plex Mono', monospace;
-    --sans: 'IBM Plex Sans', sans-serif;
-    --radius: 4px;
-    --glow: 0 0 20px rgba(0,212,255,0.15);
-  }
-
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: var(--mono);
-    font-size: 13px;
-    min-height: 100vh;
-    overflow-x: hidden;
-  }
-
-  /* ─── GRID SCAN LINE BACKGROUND ─── */
-  body::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background:
-      repeating-linear-gradient(0deg, transparent, transparent 24px, rgba(0,212,255,0.015) 25px),
-      repeating-linear-gradient(90deg, transparent, transparent 24px, rgba(0,212,255,0.01) 25px);
-    pointer-events: none;
-    z-index: 0;
-  }
-
-  /* ─── HEADER ─── */
-  header {
-    position: sticky;
-    top: 0;
-    z-index: 100;
-    background: rgba(10,11,14,0.95);
-    backdrop-filter: blur(12px);
-    border-bottom: 1px solid var(--border);
-    padding: 0 20px;
-    height: 52px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-  }
-
-  .header-brand {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    flex-shrink: 0;
-  }
-
-  .brand-logo {
-    width: 28px; height: 28px;
-    background: var(--accent);
-    clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
-    position: relative;
-    animation: pulse-logo 3s ease-in-out infinite;
-  }
-
-  @keyframes pulse-logo {
-    0%,100% { box-shadow: 0 0 0 rgba(0,212,255,0.5); }
-    50% { box-shadow: 0 0 16px rgba(0,212,255,0.4); }
-  }
-
-  .brand-title {
-    font-size: 15px;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    color: var(--accent);
-  }
-
-  .brand-subtitle {
-    font-size: 10px;
-    color: var(--text3);
-    letter-spacing: 0.2em;
-    text-transform: uppercase;
-    display: block;
-    margin-top: 1px;
-  }
-
-  .header-status {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 11px;
-    color: var(--text2);
-  }
-
-  .status-dot {
-    width: 7px; height: 7px;
-    border-radius: 50%;
-    background: var(--green);
-    box-shadow: 0 0 6px var(--green);
-    animation: blink 1.8s ease-in-out infinite;
-  }
-
-  .status-dot.idle { background: var(--text3); box-shadow: none; animation: none; }
-  .status-dot.running { background: var(--yellow); box-shadow: 0 0 6px var(--yellow); }
-  .status-dot.error { background: var(--red); box-shadow: 0 0 6px var(--red); animation: none; }
-
-  @keyframes blink {
-    0%,100% { opacity: 1; }
-    50% { opacity: 0.3; }
-  }
-
-  .header-actions {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    flex-shrink: 0;
-  }
-
-  /* ─── MAIN LAYOUT ─── */
-  .app-shell {
-    position: relative;
-    z-index: 1;
-    display: grid;
-    grid-template-columns: 280px 1fr 320px;
-    grid-template-rows: calc(100vh - 52px);
-    overflow: hidden;
-  }
-
-  @media (max-width: 1100px) {
-    .app-shell {
-      grid-template-columns: 240px 1fr;
-      grid-template-rows: auto;
-    }
-    .panel-log { display: none; }
-  }
-
-  @media (max-width: 700px) {
-    .app-shell {
-      grid-template-columns: 1fr;
-      grid-template-rows: auto;
-    }
-    .panel-commands { display: none; }
-    .mobile-nav { display: flex !important; }
-  }
-
-  /* ─── PANELS ─── */
-  .panel {
-    border-right: 1px solid var(--border);
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-  }
-
-  .panel:last-child { border-right: none; }
-
-  .panel-header {
-    padding: 12px 16px;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    background: var(--surface);
-    flex-shrink: 0;
-  }
-
-  .panel-title {
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.2em;
-    color: var(--text3);
-    font-weight: 500;
-  }
-
-  .panel-body {
-    flex: 1;
-    overflow-y: auto;
-    padding: 12px;
-  }
-
-  .panel-body::-webkit-scrollbar { width: 4px; }
-  .panel-body::-webkit-scrollbar-track { background: transparent; }
-  .panel-body::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
-
-  /* ─── BUTTONS ─── */
-  .btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 12px;
-    border: 1px solid var(--border2);
-    background: var(--surface2);
-    color: var(--text2);
-    border-radius: var(--radius);
-    cursor: pointer;
-    font-family: var(--mono);
-    font-size: 11px;
-    letter-spacing: 0.05em;
-    transition: all 0.15s;
-    white-space: nowrap;
-  }
-
-  .btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(0,212,255,0.06); }
-  .btn:active { transform: scale(0.97); }
-
-  .btn-primary {
-    background: var(--accent);
-    border-color: var(--accent);
-    color: #000;
-    font-weight: 600;
-  }
-  .btn-primary:hover { background: #00b8d9; border-color: #00b8d9; color: #000; }
-
-  .btn-danger { border-color: var(--red); color: var(--red); }
-  .btn-danger:hover { background: rgba(255,68,85,0.1); }
-
-  .btn-success { border-color: var(--green); color: var(--green); }
-  .btn-success:hover { background: rgba(0,255,136,0.08); }
-
-  .btn-sm { padding: 4px 8px; font-size: 10px; }
-  .btn-icon { padding: 6px; width: 28px; height: 28px; justify-content: center; }
-
-  /* ─── COMMAND PALETTE ─── */
-  .cmd-search {
-    width: 100%;
-    background: var(--bg);
-    border: 1px solid var(--border2);
-    color: var(--text);
-    font-family: var(--mono);
-    font-size: 12px;
-    padding: 7px 10px;
-    border-radius: var(--radius);
-    margin-bottom: 10px;
-    outline: none;
-    transition: border-color 0.15s;
-  }
-
-  .cmd-search:focus { border-color: var(--accent); }
-  .cmd-search::placeholder { color: var(--text3); }
-
-  .cmd-group-label {
-    font-size: 9px;
-    text-transform: uppercase;
-    letter-spacing: 0.2em;
-    color: var(--text3);
-    padding: 8px 0 4px;
-  }
-
-  .cmd-item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 8px 10px;
-    border-radius: var(--radius);
-    cursor: pointer;
-    transition: background 0.1s;
-    border: 1px solid transparent;
-    margin-bottom: 2px;
-  }
-
-  .cmd-item:hover { background: var(--surface2); border-color: var(--border); }
-
-  .cmd-item.dragging-source { opacity: 0.3; }
-
-  .cmd-icon {
-    width: 28px; height: 28px;
-    border-radius: 3px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 13px;
-    flex-shrink: 0;
-  }
-
-  .cmd-info { flex: 1; min-width: 0; }
-
-  .cmd-name {
-    font-size: 12px;
-    color: var(--text);
-    font-weight: 500;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .cmd-desc {
-    font-size: 10px;
-    color: var(--text3);
-    margin-top: 1px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .cmd-add { font-size: 16px; color: var(--text3); opacity: 0; transition: opacity 0.15s; }
-  .cmd-item:hover .cmd-add { opacity: 1; }
-
-  /* ─── STEP EDITOR ─── */
-  .steps-toolbar {
-    display: flex;
-    gap: 6px;
-    align-items: center;
-    flex-wrap: wrap;
-    margin-bottom: 12px;
-  }
-
-  .script-name-input {
-    flex: 1;
-    min-width: 150px;
-    background: var(--surface2);
-    border: 1px solid var(--border2);
-    color: var(--text);
-    font-family: var(--mono);
-    font-size: 13px;
-    padding: 6px 10px;
-    border-radius: var(--radius);
-    outline: none;
-  }
-
-  .script-name-input:focus { border-color: var(--accent); }
-
-  .steps-list { display: flex; flex-direction: column; gap: 6px; min-height: 120px; }
-
-  .step-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 10px 12px;
-    display: flex;
-    align-items: flex-start;
-    gap: 10px;
-    cursor: grab;
-    transition: all 0.15s;
-    position: relative;
-  }
-
-  .step-card:hover { border-color: var(--border2); }
-  .step-card.drag-over { border-color: var(--accent); background: rgba(0,212,255,0.05); }
-  .step-card.active-step { border-color: var(--yellow); box-shadow: 0 0 10px rgba(255,204,0,0.15); }
-  .step-card.done-step { border-color: var(--green); opacity: 0.7; }
-  .step-card.error-step { border-color: var(--red); }
-
-  .step-num {
-    font-size: 10px;
-    color: var(--text3);
-    min-width: 18px;
-    text-align: right;
-    margin-top: 2px;
-  }
-
-  .step-icon {
-    width: 26px; height: 26px;
-    border-radius: 3px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 12px;
-    flex-shrink: 0;
-  }
-
-  .step-content { flex: 1; min-width: 0; }
-
-  .step-type {
-    font-size: 10px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    margin-bottom: 4px;
-  }
-
-  .step-params { display: flex; flex-direction: column; gap: 4px; }
-
-  .step-param {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 11px;
-  }
-
-  .step-param label { color: var(--text3); min-width: 60px; }
-
-  .step-param input, .step-param select, .step-param textarea {
-    flex: 1;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    color: var(--text);
-    font-family: var(--mono);
-    font-size: 11px;
-    padding: 3px 6px;
-    border-radius: 2px;
-    outline: none;
-    transition: border-color 0.15s;
-  }
-
-  .step-param input:focus,
-  .step-param select:focus,
-  .step-param textarea:focus { border-color: var(--accent); }
-
-  .step-param select option { background: var(--surface); }
-  .step-param textarea { resize: vertical; min-height: 40px; }
-
-  .step-actions {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    align-items: center;
-  }
-
-  .step-delete {
-    background: none;
-    border: none;
-    color: var(--text3);
-    cursor: pointer;
-    font-size: 14px;
-    padding: 2px;
-    transition: color 0.15s;
-    line-height: 1;
-  }
-
-  .step-delete:hover { color: var(--red); }
-
-  .step-drag-handle {
-    color: var(--text3);
-    font-size: 14px;
-    cursor: grab;
-    user-select: none;
-  }
-
-  .step-status {
-    position: absolute;
-    right: 8px; top: 8px;
-    font-size: 12px;
-  }
-
-  .drop-zone {
-    border: 2px dashed var(--border2);
-    border-radius: var(--radius);
-    padding: 24px;
-    text-align: center;
-    color: var(--text3);
-    font-size: 12px;
-    transition: all 0.2s;
-    cursor: default;
-  }
-
-  .drop-zone.drag-over {
-    border-color: var(--accent);
-    background: rgba(0,212,255,0.04);
-    color: var(--accent);
-  }
-
-  /* ─── EXECUTION BAR ─── */
-  .exec-bar {
-    border-top: 1px solid var(--border);
-    padding: 10px 16px;
-    background: var(--surface);
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-    flex-shrink: 0;
-  }
-
-  .exec-progress {
-    flex: 1;
-    height: 4px;
-    background: var(--border);
-    border-radius: 2px;
-    overflow: hidden;
-    min-width: 80px;
-  }
-
-  .exec-progress-fill {
-    height: 100%;
-    background: var(--accent);
-    border-radius: 2px;
-    transition: width 0.4s ease;
-    width: 0%;
-  }
-
-  .exec-info { font-size: 11px; color: var(--text3); }
-
-  /* ─── LOG PANEL ─── */
-  .log-entries {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-
-  .log-entry {
-    display: flex;
-    gap: 8px;
-    font-size: 11px;
-    padding: 4px 0;
-    border-bottom: 1px solid var(--border);
-    animation: fadeIn 0.2s ease;
-  }
-
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(-4px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  .log-time { color: var(--text3); flex-shrink: 0; }
-  .log-level { flex-shrink: 0; font-weight: 600; width: 36px; }
-  .log-level.INFO { color: var(--accent); }
-  .log-level.OK { color: var(--green); }
-  .log-level.WARN { color: var(--yellow); }
-  .log-level.ERR { color: var(--red); }
-  .log-level.SYS { color: var(--text3); }
-  .log-msg { flex: 1; color: var(--text2); word-break: break-word; }
-
-  /* ─── SCRIPT LIBRARY ─── */
-  .script-list { display: flex; flex-direction: column; gap: 4px; }
-
-  .script-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 10px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    cursor: pointer;
-    transition: all 0.15s;
-  }
-
-  .script-item:hover { border-color: var(--border2); }
-  .script-item.active { border-color: var(--accent); background: rgba(0,212,255,0.04); }
-
-  .script-item-name { flex: 1; font-size: 12px; }
-  .script-item-count { font-size: 10px; color: var(--text3); }
-
-  /* ─── TABS ─── */
-  .tabs {
-    display: flex;
-    border-bottom: 1px solid var(--border);
-    background: var(--surface);
-    flex-shrink: 0;
-  }
-
-  .tab {
-    padding: 10px 14px;
-    font-size: 10px;
-    letter-spacing: 0.15em;
-    text-transform: uppercase;
-    color: var(--text3);
-    cursor: pointer;
-    border-bottom: 2px solid transparent;
-    transition: all 0.15s;
-    white-space: nowrap;
-  }
-
-  .tab:hover { color: var(--text2); }
-  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
-
-  .tab-content { display: none; flex: 1; overflow: hidden; flex-direction: column; }
-  .tab-content.active { display: flex; }
-
-  /* ─── MCP CONFIG ─── */
-  .config-field {
-    margin-bottom: 12px;
-  }
-
-  .config-label {
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.15em;
-    color: var(--text3);
-    margin-bottom: 4px;
-    display: block;
-  }
-
-  .config-input {
-    width: 100%;
-    background: var(--bg);
-    border: 1px solid var(--border2);
-    color: var(--text);
-    font-family: var(--mono);
-    font-size: 12px;
-    padding: 7px 10px;
-    border-radius: var(--radius);
-    outline: none;
-    transition: border-color 0.15s;
-  }
-
-  .config-input:focus { border-color: var(--accent); }
-
-  /* ─── TAGS ─── */
-  .tag {
-    display: inline-block;
-    padding: 2px 6px;
-    border-radius: 2px;
-    font-size: 9px;
-    font-weight: 600;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-  }
-
-  /* ─── COLOR THEMES for CMD types ─── */
-  .type-navigate { background: rgba(0,136,255,0.15); color: #4499ff; }
-  .type-click    { background: rgba(0,255,136,0.12); color: var(--green); }
-  .type-input    { background: rgba(255,204,0,0.12); color: var(--yellow); }
-  .type-wait     { background: rgba(255,136,0,0.12); color: var(--orange); }
-  .type-extract  { background: rgba(200,0,255,0.12); color: #cc44ff; }
-  .type-js       { background: rgba(255,68,85,0.12); color: var(--red); }
-  .type-scroll   { background: rgba(0,212,255,0.12); color: var(--accent); }
-  .type-capture  { background: rgba(100,200,255,0.12); color: #88ccff; }
-  .type-condition{ background: rgba(255,180,0,0.15); color: #ffcc44; }
-  .type-loop     { background: rgba(180,100,255,0.15); color: #cc88ff; }
-  .type-cookie   { background: rgba(0,200,150,0.12); color: #00cc99; }
-  .type-tab      { background: rgba(50,150,255,0.12); color: #5599ff; }
-
-  /* ─── TOOLTIP ─── */
-  [data-tip] { position: relative; }
-  [data-tip]:hover::after {
-    content: attr(data-tip);
-    position: absolute;
-    bottom: calc(100% + 6px);
-    left: 50%;
-    transform: translateX(-50%);
-    background: #1a1f2e;
-    border: 1px solid var(--border2);
-    color: var(--text);
-    font-size: 10px;
-    padding: 4px 8px;
-    border-radius: 2px;
-    white-space: nowrap;
-    pointer-events: none;
-    z-index: 999;
-  }
-
-  /* ─── MOBILE NAV ─── */
-  .mobile-nav {
-    display: none;
-    position: fixed;
-    bottom: 0; left: 0; right: 0;
-    background: var(--surface);
-    border-top: 1px solid var(--border);
-    z-index: 200;
-    padding: 0 8px;
-  }
-
-  .mobile-nav-btn {
-    flex: 1;
-    padding: 10px 4px;
-    background: none;
-    border: none;
-    color: var(--text3);
-    font-family: var(--mono);
-    font-size: 10px;
-    cursor: pointer;
-    text-align: center;
-    transition: color 0.15s;
-  }
-
-  .mobile-nav-btn.active { color: var(--accent); }
-
-  /* ─── SCROLLBAR GLOBAL ─── */
-  ::-webkit-scrollbar { width: 4px; height: 4px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
-
-  /* ─── BADGE ─── */
-  .badge {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 18px;
-    height: 18px;
-    background: var(--accent2);
-    color: #fff;
-    border-radius: 9px;
-    font-size: 9px;
-    font-weight: 600;
-    padding: 0 4px;
-  }
-
-  /* ─── EMPTY STATE ─── */
-  .empty-state {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    padding: 40px 20px;
-    color: var(--text3);
-    font-size: 12px;
-    text-align: center;
-  }
-
-  .empty-icon { font-size: 28px; margin-bottom: 4px; opacity: 0.4; }
-
-  /* ─── MODAL ─── */
-  .modal-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.7);
-    backdrop-filter: blur(4px);
-    z-index: 500;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 20px;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.2s;
-  }
-
-  .modal-overlay.open { opacity: 1; pointer-events: all; }
-
-  .modal {
-    background: var(--surface);
-    border: 1px solid var(--border2);
-    border-radius: 6px;
-    width: 100%;
-    max-width: 480px;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.6);
-    transform: translateY(12px);
-    transition: transform 0.2s;
-  }
-
-  .modal-overlay.open .modal { transform: translateY(0); }
-
-  .modal-header {
-    padding: 14px 16px;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-
-  .modal-title { font-size: 13px; font-weight: 600; color: var(--text); }
-
-  .modal-body { padding: 16px; }
-
-  .modal-footer {
-    padding: 12px 16px;
-    border-top: 1px solid var(--border);
-    display: flex;
-    gap: 8px;
-    justify-content: flex-end;
-  }
-
-  /* Hidden file input */
-  #importFileInput { display: none; }
-
-  /* ─── RUNNING ANIMATION ─── */
-  @keyframes scan {
-    0% { background-position: 0 0; }
-    100% { background-position: 0 100px; }
-  }
-
-  .running-indicator {
-    display: none;
-    height: 2px;
-    background: linear-gradient(90deg, transparent, var(--accent), transparent);
-    background-size: 200% 100%;
-    animation: shimmer 1.2s linear infinite;
-  }
-
-  @keyframes shimmer {
-    0% { background-position: -200% 0; }
-    100% { background-position: 200% 0; }
-  }
-
-  .running-indicator.active { display: block; }
-
+/* ═══════════════════════════════════════════
+   DESIGN TOKENS
+═══════════════════════════════════════════ */
+:root{
+  --bg:#0a0b0e; --s1:#111318; --s2:#181c24;
+  --bd:#252932; --bd2:#2e3440;
+  --ac:#00d4ff; --ac2:#0088aa;
+  --gn:#00ff88; --rd:#ff4455; --yw:#ffcc00; --or:#ff8800; --pu:#cc44ff;
+  --tx:#e0e6f0; --tx2:#8892a0; --tx3:#4a5568;
+  --mono:'IBM Plex Mono',monospace;
+  --r:4px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--tx);font-family:var(--mono);font-size:13px;display:flex;flex-direction:column}
+
+/* scan-line texture */
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:repeating-linear-gradient(0deg,transparent,transparent 24px,rgba(0,212,255,.013) 25px),
+             repeating-linear-gradient(90deg,transparent,transparent 24px,rgba(0,212,255,.008) 25px)}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:2px}
+
+/* ═══ HEADER ═══ */
+header{position:relative;z-index:10;display:flex;align-items:center;gap:12px;
+  padding:0 16px;height:50px;background:rgba(10,11,14,.97);
+  border-bottom:1px solid var(--bd);backdrop-filter:blur(10px);flex-shrink:0}
+.logo{width:26px;height:26px;background:var(--ac);flex-shrink:0;
+  clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);
+  animation:logo-pulse 3s ease-in-out infinite}
+@keyframes logo-pulse{0%,100%{opacity:1}50%{opacity:.65}}
+.brand-name{font-size:14px;font-weight:600;color:var(--ac);letter-spacing:.07em}
+.brand-sub{font-size:9px;color:var(--tx3);letter-spacing:.2em;text-transform:uppercase}
+.h-spacer{flex:1}
+.status-pill{display:flex;align-items:center;gap:5px;padding:3px 9px;
+  border:1px solid var(--bd2);border-radius:20px;background:var(--bg);font-size:10px;color:var(--tx3)}
+.sdot{width:7px;height:7px;border-radius:50%;background:var(--tx3);transition:all .3s}
+.sdot.idle{}
+.sdot.connected{background:var(--gn);box-shadow:0 0 6px var(--gn);animation:blink 2s ease infinite}
+.sdot.running{background:var(--yw);box-shadow:0 0 6px var(--yw)}
+.sdot.error{background:var(--rd);box-shadow:0 0 6px var(--rd)}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+
+/* mode badge */
+.mode-badge{font-size:9px;padding:2px 7px;border-radius:10px;border:1px solid var(--bd2);
+  color:var(--tx3);letter-spacing:.1em;text-transform:uppercase;cursor:pointer;transition:all .15s}
+.mode-badge.sim{border-color:var(--tx3);color:var(--tx3)}
+.mode-badge.ext{border-color:var(--gn);color:var(--gn)}
+.mode-badge.cdp{border-color:var(--ac);color:var(--ac)}
+
+/* running bar */
+.run-bar{height:2px;background:linear-gradient(90deg,transparent,var(--ac),transparent);
+  background-size:200%;animation:shimmer 1.1s linear infinite;display:none;flex-shrink:0}
+.run-bar.on{display:block}
+@keyframes shimmer{0%{background-position:-200%}100%{background-position:200%}}
+
+/* ═══ MAIN SHELL ═══ */
+.shell{position:relative;z-index:1;display:grid;
+  grid-template-columns:270px 1fr 300px;
+  height:calc(100vh - 50px);overflow:hidden}
+@media(max-width:1100px){.shell{grid-template-columns:240px 1fr}.log-panel{display:none}}
+@media(max-width:720px){.shell{grid-template-columns:1fr}.cmd-panel{display:none}.mob-nav{display:flex!important}}
+
+/* ═══ PANELS ═══ */
+.panel{display:flex;flex-direction:column;border-right:1px solid var(--bd);overflow:hidden}
+.panel:last-child{border-right:none}
+.p-head{display:flex;align-items:center;justify-content:space-between;
+  padding:10px 14px;border-bottom:1px solid var(--bd);background:var(--s1);flex-shrink:0}
+.p-title{font-size:10px;text-transform:uppercase;letter-spacing:.2em;color:var(--tx3);font-weight:500}
+.p-body{flex:1;overflow-y:auto;padding:12px}
+
+/* ═══ TABS ═══ */
+.tabs{display:flex;border-bottom:1px solid var(--bd);background:var(--s1);flex-shrink:0}
+.tab{padding:9px 13px;font-size:10px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--tx3);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;white-space:nowrap}
+.tab:hover{color:var(--tx2)}
+.tab.on{color:var(--ac);border-bottom-color:var(--ac)}
+.tabpanel{display:none;flex:1;overflow:hidden;flex-direction:column}
+.tabpanel.on{display:flex}
+
+/* ═══ BUTTONS ═══ */
+.btn{display:inline-flex;align-items:center;gap:5px;padding:6px 11px;
+  border:1px solid var(--bd2);background:var(--s2);color:var(--tx2);
+  border-radius:var(--r);cursor:pointer;font-family:var(--mono);font-size:11px;
+  letter-spacing:.04em;transition:all .15s;white-space:nowrap}
+.btn:hover{border-color:var(--ac);color:var(--ac);background:rgba(0,212,255,.06)}
+.btn:active{transform:scale(.97)}
+.btn.primary{background:var(--ac);border-color:var(--ac);color:#000;font-weight:600}
+.btn.primary:hover{background:#00b8d9;border-color:#00b8d9;color:#000}
+.btn.danger{border-color:var(--rd);color:var(--rd)}
+.btn.danger:hover{background:rgba(255,68,85,.1)}
+.btn.success{border-color:var(--gn);color:var(--gn)}
+.btn.success:hover{background:rgba(0,255,136,.08)}
+.btn.warn{border-color:var(--yw);color:var(--yw)}
+.btn.sm{padding:4px 8px;font-size:10px}
+.btn.ico{padding:5px;width:26px;height:26px;justify-content:center}
+.btn[disabled]{opacity:.3;pointer-events:none}
+.btn.mode-btn{font-size:10px;padding:4px 8px}
+.btn.mode-btn.on{border-color:var(--ac);color:var(--ac);background:rgba(0,212,255,.08)}
+
+/* ═══ CMD PANEL ═══ */
+.cmd-search{width:100%;background:var(--bg);border:1px solid var(--bd2);color:var(--tx);
+  font-family:var(--mono);font-size:12px;padding:7px 10px;border-radius:var(--r);
+  margin-bottom:10px;outline:none;transition:border-color .15s}
+.cmd-search:focus{border-color:var(--ac)}
+.cmd-search::placeholder{color:var(--tx3)}
+.g-label{font-size:9px;text-transform:uppercase;letter-spacing:.2em;color:var(--tx3);padding:8px 0 4px}
+.cmd-item{display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:var(--r);
+  cursor:pointer;transition:background .1s;border:1px solid transparent;margin-bottom:2px}
+.cmd-item:hover{background:var(--s2);border-color:var(--bd)}
+.cmd-icon{width:28px;height:28px;border-radius:3px;display:flex;align-items:center;
+  justify-content:center;font-size:13px;flex-shrink:0}
+.cmd-info{flex:1;min-width:0}
+.cmd-name{font-size:12px;color:var(--tx);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cmd-desc{font-size:10px;color:var(--tx3);margin-top:1px}
+.cmd-plus{font-size:16px;color:var(--tx3);opacity:0;transition:opacity .15s}
+.cmd-item:hover .cmd-plus{opacity:1}
+
+/* type colours */
+.t-navigate{background:rgba(0,136,255,.15);color:#4499ff}
+.t-click{background:rgba(0,255,136,.12);color:var(--gn)}
+.t-input{background:rgba(255,204,0,.12);color:var(--yw)}
+.t-wait{background:rgba(255,136,0,.12);color:var(--or)}
+.t-extract{background:rgba(200,0,255,.12);color:var(--pu)}
+.t-js{background:rgba(255,68,85,.12);color:var(--rd)}
+.t-scroll{background:rgba(0,212,255,.12);color:var(--ac)}
+.t-capture{background:rgba(100,200,255,.12);color:#88ccff}
+.t-condition{background:rgba(255,180,0,.15);color:#ffcc44}
+.t-loop{background:rgba(180,100,255,.15);color:#cc88ff}
+.t-cookie{background:rgba(0,200,150,.12);color:#00cc99}
+.t-tab{background:rgba(50,150,255,.12);color:#5599ff}
+
+/* ═══ STEP EDITOR ═══ */
+.steps-toolbar{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+.script-name-in{flex:1;min-width:140px;background:var(--s2);border:1px solid var(--bd2);
+  color:var(--tx);font-family:var(--mono);font-size:13px;padding:6px 10px;
+  border-radius:var(--r);outline:none;transition:border-color .15s}
+.script-name-in:focus{border-color:var(--ac)}
+.steps-list{display:flex;flex-direction:column;gap:5px}
+.drop-zone{border:2px dashed var(--bd2);border-radius:var(--r);padding:22px 16px;
+  text-align:center;color:var(--tx3);font-size:12px;line-height:1.8;
+  transition:all .2s;cursor:default;margin-top:8px}
+.drop-zone.hover{border-color:var(--ac);background:rgba(0,212,255,.04);color:var(--ac)}
+
+/* step card */
+.step-card{background:var(--s1);border:1px solid var(--bd);border-radius:var(--r);
+  padding:9px 11px;display:flex;align-items:flex-start;gap:9px;
+  cursor:default;transition:all .15s;position:relative}
+.step-card:hover{border-color:var(--bd2)}
+.step-card.active{border-color:var(--yw);box-shadow:0 0 10px rgba(255,204,0,.15)}
+.step-card.done{border-color:var(--gn);opacity:.7}
+.step-card.error{border-color:var(--rd)}
+.step-num{font-size:10px;color:var(--tx3);min-width:18px;text-align:right;margin-top:2px}
+.step-ico{width:26px;height:26px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0}
+.step-content{flex:1;min-width:0}
+.step-type{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.12em;margin-bottom:4px}
+.step-params{display:flex;flex-direction:column;gap:3px}
+.sp{display:flex;align-items:center;gap:6px;font-size:11px}
+.sp label{color:var(--tx3);min-width:58px}
+.sp input,.sp select,.sp textarea{flex:1;background:var(--bg);border:1px solid var(--bd);
+  color:var(--tx);font-family:var(--mono);font-size:11px;padding:3px 6px;
+  border-radius:2px;outline:none;transition:border-color .15s}
+.sp input:focus,.sp select:focus,.sp textarea:focus{border-color:var(--ac)}
+.sp select option{background:var(--s2)}
+.sp textarea{resize:vertical;min-height:38px}
+.step-actions{display:flex;flex-direction:column;gap:4px;align-items:center}
+.step-drag{color:var(--tx3);font-size:14px;cursor:grab;user-select:none}
+.step-del{background:none;border:none;color:var(--tx3);cursor:pointer;font-size:13px;line-height:1;transition:color .15s}
+.step-del:hover{color:var(--rd)}
+.step-state{position:absolute;right:8px;top:8px;font-size:12px}
+
+/* ═══ EXEC BAR ═══ */
+.exec-bar{display:flex;align-items:center;gap:8px;padding:9px 14px;
+  border-top:1px solid var(--bd);background:var(--s1);flex-shrink:0;flex-wrap:wrap}
+.exec-prog{flex:1;height:3px;background:var(--bd);border-radius:2px;overflow:hidden;min-width:60px}
+.exec-prog-fill{height:100%;background:var(--ac);border-radius:2px;transition:width .4s ease;width:0}
+.exec-info{font-size:10px;color:var(--tx3)}
+.mode-group{display:flex;align-items:center;gap:4px;margin-left:auto;flex-shrink:0}
+.mode-group span{font-size:9px;color:var(--tx3);text-transform:uppercase;letter-spacing:.12em}
+
+/* ext banner */
+.ext-banner{display:none;align-items:center;gap:8px;padding:7px 14px;
+  border-top:1px solid rgba(0,255,136,.2);background:rgba(0,255,136,.05);
+  font-size:11px;color:var(--gn);flex-shrink:0}
+
+/* ═══ LOG ═══ */
+.log-list{display:flex;flex-direction:column;gap:1px}
+.log-row{display:flex;gap:7px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.03);
+  font-size:10px;animation:fi .2s ease}
+@keyframes fi{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:translateY(0)}}
+.lt{color:var(--tx3);flex-shrink:0}
+.ll{flex-shrink:0;width:30px;font-weight:600}
+.ll.INFO{color:var(--ac)}.ll.OK{color:var(--gn)}.ll.WARN{color:var(--yw)}.ll.ERR{color:var(--rd)}.ll.SYS{color:var(--tx3)}
+.lm{flex:1;color:var(--tx2);word-break:break-word}
+
+/* ═══ LIBRARY ═══ */
+.lib-list{display:flex;flex-direction:column;gap:3px}
+.lib-item{display:flex;align-items:center;gap:8px;padding:8px 10px;
+  background:var(--s1);border:1px solid var(--bd);border-radius:var(--r);
+  cursor:pointer;transition:all .15s}
+.lib-item:hover{border-color:var(--bd2)}
+.lib-name{flex:1;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lib-count{font-size:10px;color:var(--tx3);flex-shrink:0}
+
+/* ═══ CONFIG ═══ */
+.cf{margin-bottom:12px}
+.cf-label{font-size:10px;text-transform:uppercase;letter-spacing:.15em;color:var(--tx3);margin-bottom:4px;display:block}
+.cf-input{width:100%;background:var(--bg);border:1px solid var(--bd2);color:var(--tx);
+  font-family:var(--mono);font-size:12px;padding:7px 9px;border-radius:var(--r);outline:none;transition:border-color .15s}
+.cf-input:focus{border-color:var(--ac)}
+.cf-input option{background:var(--s2)}
+.info-box{background:var(--bg);border:1px solid var(--bd);border-radius:var(--r);
+  padding:11px 13px;font-size:11px;color:var(--tx2);line-height:1.8}
+.info-box code{color:var(--ac);font-size:10px}
+
+/* ═══ DIAG ═══ */
+.diag-row{display:flex;gap:8px;font-size:11px;line-height:1.9}
+.diag-icon{flex-shrink:0;width:16px}
+.diag-key{color:var(--tx3);min-width:140px;flex-shrink:0}
+.diag-val{flex:1;word-break:break-all}
+
+/* ═══ MODAL ═══ */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);
+  z-index:500;display:flex;align-items:center;justify-content:center;padding:20px;
+  opacity:0;pointer-events:none;transition:opacity .2s}
+.overlay.open{opacity:1;pointer-events:all}
+.modal{background:var(--s1);border:1px solid var(--bd2);border-radius:6px;
+  width:100%;max-width:500px;box-shadow:0 20px 60px rgba(0,0,0,.6);
+  transform:translateY(12px);transition:transform .2s}
+.overlay.open .modal{transform:translateY(0)}
+.modal-head{padding:13px 16px;border-bottom:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between}
+.modal-title{font-size:13px;font-weight:600}
+.modal-body{padding:16px;max-height:70vh;overflow-y:auto}
+.modal-foot{padding:11px 16px;border-top:1px solid var(--bd);display:flex;gap:8px;justify-content:flex-end}
+
+/* ═══ BADGE / EMPTY ═══ */
+.badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;
+  background:var(--ac2);color:#fff;border-radius:9px;font-size:9px;font-weight:600;padding:0 4px}
+.empty-state{display:flex;flex-direction:column;align-items:center;gap:8px;
+  padding:36px 20px;color:var(--tx3);font-size:12px;text-align:center}
+.empty-icon{font-size:26px;opacity:.35;margin-bottom:2px}
+
+/* ═══ MOBILE NAV ═══ */
+.mob-nav{display:none;position:fixed;bottom:0;left:0;right:0;background:var(--s1);
+  border-top:1px solid var(--bd);z-index:200;padding:0 6px}
+.mob-btn{flex:1;padding:9px 4px;background:none;border:none;color:var(--tx3);
+  font-family:var(--mono);font-size:10px;cursor:pointer;text-align:center;transition:color .15s}
+.mob-btn.on{color:var(--ac)}
+
+/* ═══ INSTALL GUIDE ═══ */
+.install-steps{counter-reset:step}
+.install-step{display:flex;gap:10px;margin-bottom:10px;font-size:11px;color:var(--tx2);line-height:1.7}
+.install-step::before{counter-increment:step;content:counter(step);
+  flex-shrink:0;width:20px;height:20px;border-radius:50%;
+  background:var(--ac2);color:#fff;font-size:10px;font-weight:600;
+  display:flex;align-items:center;justify-content:center;margin-top:1px}
+
+/* ═══ VARS DISPLAY ═══ */
+.var-row{display:flex;gap:8px;font-size:11px;padding:4px 8px;background:var(--s1);
+  border:1px solid var(--bd);border-radius:2px;margin-bottom:3px}
+.var-key{color:var(--ac);flex-shrink:0;min-width:80px}
+.var-val{color:var(--tx2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+
+/* tooltip */
+[data-tip]{position:relative}
+[data-tip]:hover::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 6px);
+  left:50%;transform:translateX(-50%);background:#1a1f2e;border:1px solid var(--bd2);
+  color:var(--tx);font-size:10px;padding:4px 8px;border-radius:2px;
+  white-space:nowrap;pointer-events:none;z-index:999}
 </style>
 </head>
 <body>
 
+<!-- ══════════════════════════════════════════
+     HEADER
+══════════════════════════════════════════ -->
 <header>
-  <div class="header-brand">
-    <div class="brand-logo"></div>
-    <div>
-      <div class="brand-title">MCP · RPA</div>
-      <span class="brand-subtitle">Chrome Controller</span>
-    </div>
+  <div class="logo"></div>
+  <div>
+    <div class="brand-name">MCP · RPA Controller</div>
+    <div class="brand-sub">All-in-One · v2.0</div>
   </div>
-
-  <div class="header-status">
-    <div class="status-dot idle" id="statusDot"></div>
-    <span id="statusText">未連線</span>
+  <div class="h-spacer"></div>
+  <div class="status-pill">
+    <div class="sdot idle" id="sdot"></div>
+    <span id="stext">待機</span>
   </div>
-
-  <div class="header-actions">
-    <button class="btn btn-sm" onclick="openModal('configModal')" data-tip="MCP 設定">⚙ 設定</button>
-    <button class="btn btn-sm" onclick="importScript()" data-tip="匯入腳本">↑ 匯入</button>
-    <button class="btn btn-sm" onclick="exportScript()" data-tip="匯出腳本">↓ 匯出</button>
-    <input type="file" id="importFileInput" accept=".json" onchange="handleImport(event)">
-  </div>
+  <div class="mode-badge sim" id="modeBadge" onclick="openModal('modeModal')" data-tip="點擊切換執行模式">⬡ 模擬</div>
+  <button class="btn sm" onclick="importScript()" data-tip="匯入 JSON">↑ 匯入</button>
+  <button class="btn sm" onclick="exportScript()" data-tip="匯出 JSON">↓ 匯出</button>
+  <button class="btn sm ico" onclick="openModal('settingModal')" data-tip="設定">⚙</button>
+  <input type="file" id="importFile" accept=".json" style="display:none" onchange="handleImport(event)">
 </header>
+<div class="run-bar" id="runBar"></div>
 
-<div class="running-indicator" id="runningIndicator"></div>
+<!-- ══════════════════════════════════════════
+     MAIN SHELL
+══════════════════════════════════════════ -->
+<div class="shell">
 
-<div class="app-shell">
-
-  <!-- ═══ LEFT: COMMAND PALETTE ═══ -->
-  <div class="panel panel-commands">
-    <div class="panel-header">
-      <span class="panel-title">指令庫</span>
-      <span class="badge" id="cmdCount">0</span>
+  <!-- ── LEFT: COMMAND PALETTE ── -->
+  <div class="panel cmd-panel">
+    <div class="p-head">
+      <span class="p-title">指令庫</span>
+      <span class="badge" id="cmdBadge">0</span>
     </div>
-    <div class="panel-body">
-      <input class="cmd-search" placeholder="搜尋指令..." id="cmdSearch" oninput="filterCommands()">
-      <div id="commandList"></div>
+    <div class="p-body">
+      <input class="cmd-search" id="cmdSearch" placeholder="搜尋指令..." oninput="renderCmds()">
+      <div id="cmdList"></div>
     </div>
   </div>
 
-  <!-- ═══ CENTER: STEP EDITOR + SCRIPT LIBRARY ═══ -->
-  <div class="panel" style="border-right:none;">
+  <!-- ── CENTER: EDITOR + LIBRARY + CONFIG ── -->
+  <div class="panel" style="border-right:none">
     <div class="tabs">
-      <div class="tab active" onclick="switchMainTab('editor')">腳本編輯器</div>
-      <div class="tab" onclick="switchMainTab('library')">腳本庫</div>
-      <div class="tab" onclick="switchMainTab('mcp')">MCP 設定</div>
+      <div class="tab on"  onclick="switchTab('editor')">腳本編輯器</div>
+      <div class="tab"     onclick="switchTab('library')">腳本庫</div>
+      <div class="tab"     onclick="switchTab('config')">MCP 設定</div>
+      <div class="tab"     onclick="switchTab('install')">Extension 安裝</div>
     </div>
 
-    <!-- EDITOR TAB -->
-    <div class="tab-content active" id="tab-editor">
-      <div class="panel-body">
+    <!-- EDITOR -->
+    <div class="tabpanel on" id="tp-editor">
+      <div class="p-body">
         <div class="steps-toolbar">
-          <input class="script-name-input" id="scriptName" value="未命名腳本" placeholder="腳本名稱">
-          <button class="btn btn-sm" onclick="clearSteps()" data-tip="清空步驟">✕ 清空</button>
+          <input class="script-name-in" id="scriptName" value="未命名腳本" placeholder="腳本名稱">
+          <button class="btn sm success" onclick="saveToLib()">+ 存庫</button>
+          <button class="btn sm" onclick="clearSteps()">✕ 清空</button>
         </div>
         <div class="steps-list" id="stepsList"></div>
-        <div class="drop-zone" id="dropZone">
-          ← 從左側拖曳指令到此處，或點擊指令旁的 <strong>+</strong> 加入步驟
+        <div class="drop-zone" id="dropZone">← 從左側拖曳指令，或點擊 <strong>+</strong> 加入步驟</div>
+
+        <!-- Variables display -->
+        <div id="varsWrap" style="display:none;margin-top:10px">
+          <div class="g-label">執行變數</div>
+          <div id="varsDisplay"></div>
         </div>
       </div>
+
+      <!-- EXEC BAR -->
       <div class="exec-bar">
-        <button class="btn btn-success" onclick="runScript()" id="runBtn">▶ 執行</button>
-        <button class="btn btn-danger" onclick="stopScript()" id="stopBtn" style="display:none;">■ 停止</button>
-        <button class="btn btn-sm" onclick="stepScript()" id="stepBtn">▷ 單步</button>
-        <div class="exec-progress">
-          <div class="exec-progress-fill" id="progressFill"></div>
-        </div>
+        <button class="btn success" onclick="runScript()" id="runBtn">▶ 執行</button>
+        <button class="btn danger"  onclick="stopScript()" id="stopBtn" style="display:none">■ 停止</button>
+        <button class="btn sm warn" onclick="pauseScript()" id="pauseBtn" style="display:none">⏸ 暫停</button>
+        <button class="btn sm"      onclick="stepOnce()" id="stepBtn">▷ 單步</button>
+        <div class="exec-prog"><div class="exec-prog-fill" id="progFill"></div></div>
         <div class="exec-info" id="execInfo">就緒</div>
+        <!-- MODE BUTTONS -->
+        <div class="mode-group">
+          <span>模式</span>
+          <button class="btn sm mode-btn on" id="mbSim" onclick="setMode('simulate')" data-tip="模擬（不操作瀏覽器）">⬡ 模擬</button>
+          <button class="btn sm mode-btn"    id="mbExt" onclick="setMode('extension')" data-tip="Extension 真實執行">⬡ EXT</button>
+          <button class="btn sm mode-btn"    id="mbCdp" onclick="setMode('cdp')" data-tip="WebSocket CDP（port 9222）">⬡ CDP</button>
+        </div>
+      </div>
+      <!-- EXT BANNER -->
+      <div class="ext-banner" id="extBanner">
+        <span>⬡</span>
+        <span>Extension 模式 · 腳本將在 Chrome 真實執行</span>
+        <button class="btn sm" style="margin-left:auto;border-color:var(--gn);color:var(--gn)" onclick="checkExt()">◎ 偵測 Extension</button>
       </div>
     </div>
 
-    <!-- LIBRARY TAB -->
-    <div class="tab-content" id="tab-library">
-      <div class="panel-body">
-        <div style="display:flex;gap:8px;margin-bottom:12px;">
-          <button class="btn btn-sm btn-primary" onclick="saveToLibrary()">+ 儲存目前腳本</button>
-          <button class="btn btn-sm" onclick="importScript()">↑ 匯入 JSON</button>
-        </div>
-        <div class="script-list" id="scriptLibraryList"></div>
-      </div>
-    </div>
-
-    <!-- MCP CONFIG TAB -->
-    <div class="tab-content" id="tab-mcp">
-      <div class="panel-body">
-        <div class="config-field">
-          <label class="config-label">MCP 伺服器端點</label>
-          <input class="config-input" id="mcpEndpoint" value="ws://localhost:9222/devtools" placeholder="ws://localhost:9222/devtools">
-        </div>
-        <div class="config-field">
-          <label class="config-label">Chrome 除錯埠</label>
-          <input class="config-input" id="chromePort" value="9222" placeholder="9222">
-        </div>
-        <div class="config-field">
-          <label class="config-label">連線逾時 (ms)</label>
-          <input class="config-input" id="timeout" value="30000" placeholder="30000">
-        </div>
-        <div class="config-field">
-          <label class="config-label">使用者代理</label>
-          <input class="config-input" id="userAgent" value="Mozilla/5.0 (compatible; MCP-RPA/1.0)" placeholder="User Agent">
-        </div>
-        <div class="config-field">
-          <label class="config-label">步驟間延遲 (ms)</label>
-          <input class="config-input" id="stepDelay" value="500" placeholder="500">
-        </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <button class="btn btn-primary" onclick="connectMCP()">⬡ 連線 MCP</button>
-          <button class="btn btn-danger" onclick="disconnectMCP()">⬡ 斷線</button>
-          <button class="btn btn-sm" onclick="testConnection()">◎ 測試連線</button>
-        </div>
-
-        <div style="margin-top:20px;padding:14px;background:var(--bg);border:1px solid var(--border);border-radius:4px;">
-          <div class="config-label" style="margin-bottom:8px;">啟動 Chrome 除錯模式</div>
-          <div style="font-size:11px;color:var(--text2);line-height:1.7;">
-            Windows:<br>
-            <code style="color:var(--accent);font-size:10px;">chrome.exe --remote-debugging-port=9222</code><br><br>
-            macOS:<br>
-            <code style="color:var(--accent);font-size:10px;">/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --remote-debugging-port=9222</code><br><br>
-            Linux:<br>
-            <code style="color:var(--accent);font-size:10px;">google-chrome --remote-debugging-port=9222</code>
+    <!-- LIBRARY -->
+    <div class="tabpanel" id="tp-library">
+      <div class="p-body">
+        <div class="g-label" style="padding-top:0">🤖 內建 · Gemini 對話系列</div>
+        <div class="lib-list" id="builtinList" style="margin-bottom:16px"></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <div class="g-label" style="padding:0">📁 我的腳本庫</div>
+          <div style="display:flex;gap:6px">
+            <button class="btn sm primary" onclick="saveToLib()">+ 儲存目前腳本</button>
+            <button class="btn sm" onclick="importScript()">↑ 匯入</button>
           </div>
         </div>
+        <div class="lib-list" id="userLibList"></div>
+      </div>
+    </div>
+
+    <!-- CONFIG -->
+    <div class="tabpanel" id="tp-config">
+      <div class="p-body">
+        <div class="cf">
+          <label class="cf-label">MCP / CDP WebSocket 端點</label>
+          <input class="cf-input" id="cfEndpoint" value="ws://localhost:9222/devtools" placeholder="ws://localhost:9222/devtools">
+        </div>
+        <div class="cf" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div>
+            <label class="cf-label">Chrome 除錯埠</label>
+            <input class="cf-input" id="cfPort" value="9222" placeholder="9222">
+          </div>
+          <div>
+            <label class="cf-label">步驟延遲 (ms)</label>
+            <input class="cf-input" id="cfDelay" value="800" type="number" min="100">
+          </div>
+        </div>
+        <div class="cf" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div>
+            <label class="cf-label">等待逾時 (ms)</label>
+            <input class="cf-input" id="cfTimeout" value="15000" type="number">
+          </div>
+          <div>
+            <label class="cf-label">錯誤處理</label>
+            <select class="cf-input" id="cfError">
+              <option value="stop">遇錯停止</option>
+              <option value="skip">遇錯跳過</option>
+              <option value="retry">重試一次</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
+          <button class="btn primary" onclick="connectCDP()">⬡ 連線 CDP</button>
+          <button class="btn danger"  onclick="disconnectCDP()">⬡ 斷線</button>
+          <button class="btn sm"      onclick="testCDP()">◎ 測試</button>
+          <button class="btn sm"      onclick="checkExt()">⬡ 偵測 Extension</button>
+        </div>
+
+        <!-- DIAGNOSTICS -->
+        <div class="info-box" style="margin-bottom:12px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <span style="font-size:10px;text-transform:uppercase;letter-spacing:.15em;color:var(--tx3)">🔍 環境診斷</span>
+            <button class="btn sm" onclick="runDiag()">▶ 執行</button>
+          </div>
+          <div id="diagBox" style="color:var(--tx3)">點擊「執行」自動偵測 Chrome 除錯環境。</div>
+        </div>
+
+        <!-- Chrome launch commands -->
+        <div class="info-box">
+          <div style="font-size:10px;text-transform:uppercase;letter-spacing:.15em;color:var(--tx3);margin-bottom:8px">啟動 Chrome 除錯模式</div>
+          <div style="color:var(--tx3);margin-bottom:2px">Windows</div>
+          <code>chrome.exe --remote-debugging-port=9222</code><br><br>
+          <div style="color:var(--tx3);margin-bottom:2px">macOS</div>
+          <code>/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --remote-debugging-port=9222</code><br><br>
+          <div style="color:var(--tx3);margin-bottom:2px">Linux</div>
+          <code>google-chrome --remote-debugging-port=9222</code>
+        </div>
+      </div>
+    </div>
+
+    <!-- INSTALL GUIDE -->
+    <div class="tabpanel" id="tp-install">
+      <div class="p-body">
+        <div class="g-label" style="padding-top:0">⬡ Extension 安裝指引</div>
+        <div style="margin-bottom:16px;padding:10px 12px;background:rgba(0,212,255,.05);border:1px solid rgba(0,212,255,.2);border-radius:4px;font-size:11px;color:var(--ac)">
+          安裝 Extension 後，本工具可在 <strong>EXT 模式</strong>下直接控制 Chrome，無需開啟除錯埠。
+        </div>
+        <div class="install-steps">
+          <div class="install-step">點擊下方「⬇ 下載 Extension」按鈕，下載 <code>mcp-rpa-extension.zip</code></div>
+          <div class="install-step">解壓縮到任意資料夾（例如桌面）</div>
+          <div class="install-step">在 Chrome 網址列輸入 <code>chrome://extensions/</code></div>
+          <div class="install-step">開啟右上角「<strong>開發人員模式</strong>」</div>
+          <div class="install-step">點擊「<strong>載入未封裝項目</strong>」→ 選擇解壓縮後的資料夾</div>
+          <div class="install-step">工具列出現 <strong>⬡ 六角形</strong>圖示即安裝成功</div>
+          <div class="install-step">回到本頁面，底部切換到「⬡ EXT」模式，點「◎ 偵測 Extension」確認連線</div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">
+          <button class="btn primary" onclick="downloadExtension()">⬇ 下載 Extension ZIP</button>
+          <button class="btn sm" onclick="checkExt()">◎ 偵測是否已安裝</button>
+        </div>
+        <div style="margin-top:16px" class="info-box">
+          <div style="font-size:10px;text-transform:uppercase;letter-spacing:.15em;color:var(--tx3);margin-bottom:8px">三種執行模式比較</div>
+          <table style="width:100%;border-collapse:collapse;font-size:10px;color:var(--tx2)">
+            <tr style="color:var(--tx3);border-bottom:1px solid var(--bd)">
+              <td style="padding:4px 6px">功能</td>
+              <td style="padding:4px 6px;text-align:center">模擬</td>
+              <td style="padding:4px 6px;text-align:center;color:var(--gn)">EXT ★</td>
+              <td style="padding:4px 6px;text-align:center">CDP</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--bd)">
+              <td style="padding:4px 6px">真實操作</td>
+              <td style="padding:4px 6px;text-align:center;color:var(--rd)">✗</td>
+              <td style="padding:4px 6px;text-align:center;color:var(--gn)">✓</td>
+              <td style="padding:4px 6px;text-align:center;color:var(--gn)">✓</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--bd)">
+              <td style="padding:4px 6px">需除錯埠</td>
+              <td style="padding:4px 6px;text-align:center;color:var(--gn)">✗</td>
+              <td style="padding:4px 6px;text-align:center;color:var(--gn)">✗</td>
+              <td style="padding:4px 6px;text-align:center;color:var(--rd)">✓</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--bd)">
+              <td style="padding:4px 6px">截圖下載</td>
+              <td style="padding:4px 6px;text-align:center;color:var(--rd)">✗</td>
+              <td style="padding:4px 6px;text-align:center;color:var(--gn)">✓</td>
+              <td style="padding:4px 6px;text-align:center;color:var(--gn)">✓</td>
+            </tr>
+            <tr>
+              <td style="padding:4px 6px">Cookie API</td>
+              <td style="padding:4px 6px;text-align:center;color:var(--rd)">✗</td>
+              <td style="padding:4px 6px;text-align:center;color:var(--gn)">✓</td>
+              <td style="padding:4px 6px;text-align:center;color:var(--yw)">△</td>
+            </tr>
+          </table>
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- ═══ RIGHT: LOG PANEL ═══ -->
-  <div class="panel panel-log" style="border-left:1px solid var(--border);">
-    <div class="panel-header">
-      <span class="panel-title">執行日誌</span>
-      <button class="btn btn-sm btn-icon" onclick="clearLog()" data-tip="清除日誌" style="font-size:14px;">⌫</button>
+  <!-- ── RIGHT: LOG ── -->
+  <div class="panel log-panel" style="border-left:1px solid var(--bd)">
+    <div class="p-head">
+      <span class="p-title">執行日誌</span>
+      <div style="display:flex;gap:4px">
+        <button class="btn sm ico" onclick="exportLog()" data-tip="匯出日誌">↓</button>
+        <button class="btn sm ico" onclick="clearLog()" data-tip="清除">⌫</button>
+      </div>
     </div>
-    <div class="panel-body">
-      <div class="log-entries" id="logEntries"></div>
-    </div>
+    <div class="p-body"><div class="log-list" id="logList"></div></div>
   </div>
 
-</div>
+</div><!-- /.shell -->
 
 <!-- MOBILE NAV -->
-<div class="mobile-nav" id="mobileNav">
-  <button class="mobile-nav-btn active" onclick="mobileSwitch('cmds',this)">指令庫</button>
-  <button class="mobile-nav-btn" onclick="mobileSwitch('editor',this)">編輯器</button>
-  <button class="mobile-nav-btn" onclick="mobileSwitch('log',this)">日誌</button>
+<div class="mob-nav" id="mobNav">
+  <button class="mob-btn on" onclick="mobSwitch('cmd',this)">指令庫</button>
+  <button class="mob-btn"    onclick="mobSwitch('editor',this)">編輯器</button>
+  <button class="mob-btn"    onclick="mobSwitch('log',this)">日誌</button>
 </div>
 
-<!-- CONFIG MODAL -->
-<div class="modal-overlay" id="configModal">
+<!-- ══ MODAL: MODE ══ -->
+<div class="overlay" id="modeModal">
   <div class="modal">
-    <div class="modal-header">
-      <span class="modal-title">⚙ 快速設定</span>
-      <button class="btn btn-sm btn-icon" onclick="closeModal('configModal')">✕</button>
-    </div>
+    <div class="modal-head"><span class="modal-title">⬡ 執行模式選擇</span><button class="btn sm ico" onclick="closeModal('modeModal')">✕</button></div>
     <div class="modal-body">
-      <div class="config-field">
-        <label class="config-label">MCP 連線狀態</label>
-        <div style="font-size:12px;color:var(--text2);" id="modalStatus">—</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div class="lib-item" onclick="setMode('simulate');closeModal('modeModal')" style="border-color:var(--bd2)">
+          <span style="font-size:18px">⬡</span>
+          <div style="flex:1"><div style="font-size:12px;font-weight:600;color:var(--tx)">模擬模式</div><div style="font-size:10px;color:var(--tx3);margin-top:2px">記錄步驟但不真實操作瀏覽器。適合腳本設計階段。</div></div>
+          <span id="modeCheck-simulate" style="color:var(--gn)"></span>
+        </div>
+        <div class="lib-item" onclick="setMode('extension');closeModal('modeModal')" style="border-color:var(--gn)">
+          <span style="font-size:18px;color:var(--gn)">⬡</span>
+          <div style="flex:1"><div style="font-size:12px;font-weight:600;color:var(--gn)">Extension 模式 ★ 推薦</div><div style="font-size:10px;color:var(--tx3);margin-top:2px">透過已安裝的 Extension 真實執行。不需要開除錯埠。</div></div>
+          <span id="modeCheck-extension" style="color:var(--gn)"></span>
+        </div>
+        <div class="lib-item" onclick="setMode('cdp');closeModal('modeModal')" style="border-color:var(--ac)">
+          <span style="font-size:18px;color:var(--ac)">⬡</span>
+          <div style="flex:1"><div style="font-size:12px;font-weight:600;color:var(--ac)">CDP WebSocket 模式</div><div style="font-size:10px;color:var(--tx3);margin-top:2px">直連 Chrome DevTools Protocol。需 --remote-debugging-port=9222。</div></div>
+          <span id="modeCheck-cdp" style="color:var(--gn)"></span>
+        </div>
       </div>
-      <div class="config-field">
-        <label class="config-label">執行速度</label>
-        <select class="config-input" id="execSpeed">
-          <option value="200">快速 (200ms)</option>
-          <option value="500" selected>正常 (500ms)</option>
-          <option value="1000">慢速 (1000ms)</option>
-          <option value="2000">超慢 (2000ms，除錯用)</option>
+    </div>
+    <div class="modal-foot"><button class="btn" onclick="closeModal('modeModal')">關閉</button></div>
+  </div>
+</div>
+
+<!-- ══ MODAL: SETTINGS ══ -->
+<div class="overlay" id="settingModal">
+  <div class="modal">
+    <div class="modal-head"><span class="modal-title">⚙ 快速設定</span><button class="btn sm ico" onclick="closeModal('settingModal')">✕</button></div>
+    <div class="modal-body">
+      <div class="cf"><label class="cf-label">執行速度</label>
+        <select class="cf-input" id="setSpeed">
+          <option value="200">快速 200ms</option>
+          <option value="500">正常 500ms</option>
+          <option value="800" selected>穩定 800ms</option>
+          <option value="1500">慢速 1500ms</option>
+          <option value="2500">除錯 2500ms</option>
         </select>
       </div>
-      <div class="config-field">
-        <label class="config-label">錯誤處理</label>
-        <select class="config-input" id="errorHandling">
+      <div class="cf"><label class="cf-label">錯誤處理</label>
+        <select class="cf-input" id="setError">
           <option value="stop">遇錯停止</option>
           <option value="skip">遇錯跳過</option>
           <option value="retry">重試一次</option>
         </select>
       </div>
+      <div class="cf" id="modalStatus" style="font-size:11px;color:var(--tx2)"></div>
     </div>
-    <div class="modal-footer">
-      <button class="btn" onclick="closeModal('configModal')">關閉</button>
-      <button class="btn btn-primary" onclick="applyConfig()">套用</button>
+    <div class="modal-foot">
+      <button class="btn" onclick="closeModal('settingModal')">關閉</button>
+      <button class="btn primary" onclick="applySettings()">套用</button>
     </div>
   </div>
 </div>
 
 <script>
+// ╔═══════════════════════════════════════════════════════╗
+// ║   MCP · RPA Controller  —  All-in-One Engine         ║
+// ║   Sections:                                           ║
+// ║   1. CONSTANTS (commands, builtin scripts)            ║
+// ║   2. STATE                                            ║
+// ║   3. INIT                                             ║
+// ║   4. COMMAND PANEL                                    ║
+// ║   5. STEP EDITOR                                      ║
+// ║   6. EXECUTION ENGINE (router)                        ║
+// ║   7. SIMULATE ENGINE                                  ║
+// ║   8. CDP ENGINE (WebSocket DevTools Protocol)         ║
+// ║   9. EXTENSION ENGINE (postMessage bridge)            ║
+// ║  10. EXTENSION DOWNLOADER (self-contained ZIP)        ║
+// ║  11. SCRIPT LIBRARY                                   ║
+// ║  12. IMPORT / EXPORT                                  ║
+// ║  13. LOG                                              ║
+// ║  14. MCP/CDP CONNECTION                               ║
+// ║  15. DIAGNOSTICS                                      ║
+// ║  16. UI HELPERS (tabs, modals, status, mobile)        ║
+// ╚═══════════════════════════════════════════════════════╝
+
 // ═══════════════════════════════════════════
-//  DATA DEFINITIONS
+// 1. CONSTANTS
 // ═══════════════════════════════════════════
 
 const COMMANDS = [
-  {
-    group: '導覽',
-    items: [
-      { id: 'navigate', name: '開啟網址', desc: 'Navigate to URL', icon: '🌐', type: 'navigate',
-        params: [
-          { key: 'url', label: 'URL', type: 'text', placeholder: 'https://example.com' }
-        ]
-      },
-      { id: 'tab_new', name: '新增分頁', desc: 'Open new tab', icon: '＋', type: 'tab',
-        params: [
-          { key: 'url', label: 'URL', type: 'text', placeholder: 'about:blank' }
-        ]
-      },
-      { id: 'tab_close', name: '關閉分頁', desc: 'Close current tab', icon: '✕', type: 'tab', params: [] },
-      { id: 'reload', name: '重新整理', desc: 'Reload page', icon: '↻', type: 'navigate', params: [] },
-      { id: 'back', name: '上一頁', desc: 'Go back', icon: '←', type: 'navigate', params: [] },
-      { id: 'forward', name: '下一頁', desc: 'Go forward', icon: '→', type: 'navigate', params: [] },
-    ]
-  },
-  {
-    group: '互動',
-    items: [
-      { id: 'click', name: '點擊元素', desc: 'Click element by selector', icon: '👆', type: 'click',
-        params: [
-          { key: 'selector', label: '選擇器', type: 'text', placeholder: '#button, .class, [attr]' },
-          { key: 'button', label: '按鍵', type: 'select', options: ['left','right','middle'] }
-        ]
-      },
-      { id: 'dblclick', name: '雙擊元素', desc: 'Double click element', icon: '👆', type: 'click',
-        params: [
-          { key: 'selector', label: '選擇器', type: 'text', placeholder: '#element' }
-        ]
-      },
-      { id: 'hover', name: '懸停元素', desc: 'Hover over element', icon: '🖱', type: 'click',
-        params: [
-          { key: 'selector', label: '選擇器', type: 'text', placeholder: '#menu-item' }
-        ]
-      },
-      { id: 'type', name: '輸入文字', desc: 'Type into element', icon: '⌨', type: 'input',
-        params: [
-          { key: 'selector', label: '選擇器', type: 'text', placeholder: 'input[name="username"]' },
-          { key: 'value', label: '文字', type: 'text', placeholder: '輸入內容' },
-          { key: 'clear', label: '先清空', type: 'select', options: ['true','false'] }
-        ]
-      },
-      { id: 'select', name: '下拉選擇', desc: 'Select option', icon: '☰', type: 'input',
-        params: [
-          { key: 'selector', label: '選擇器', type: 'text', placeholder: 'select#country' },
-          { key: 'value', label: '選項值', type: 'text', placeholder: 'TW' }
-        ]
-      },
-      { id: 'key_press', name: '按下按鍵', desc: 'Press keyboard key', icon: '⌥', type: 'input',
-        params: [
-          { key: 'key', label: '按鍵', type: 'text', placeholder: 'Enter, Tab, Escape, F5' }
-        ]
-      },
-      { id: 'scroll', name: '捲動頁面', desc: 'Scroll page', icon: '↕', type: 'scroll',
-        params: [
-          { key: 'direction', label: '方向', type: 'select', options: ['down','up','top','bottom'] },
-          { key: 'amount', label: '距離(px)', type: 'text', placeholder: '500' }
-        ]
-      },
-      { id: 'scroll_to', name: '捲動到元素', desc: 'Scroll to element', icon: '↕', type: 'scroll',
-        params: [
-          { key: 'selector', label: '選擇器', type: 'text', placeholder: '#target' }
-        ]
-      },
-    ]
-  },
-  {
-    group: '擷取',
-    items: [
-      { id: 'extract_text', name: '擷取文字', desc: 'Get element text content', icon: '📋', type: 'extract',
-        params: [
-          { key: 'selector', label: '選擇器', type: 'text', placeholder: 'h1.title' },
-          { key: 'var', label: '存入變數', type: 'text', placeholder: 'result' }
-        ]
-      },
-      { id: 'extract_attr', name: '擷取屬性', desc: 'Get element attribute', icon: '🏷', type: 'extract',
-        params: [
-          { key: 'selector', label: '選擇器', type: 'text', placeholder: 'img.hero' },
-          { key: 'attr', label: '屬性名', type: 'text', placeholder: 'src, href, value' },
-          { key: 'var', label: '存入變數', type: 'text', placeholder: 'imgUrl' }
-        ]
-      },
-      { id: 'screenshot', name: '截圖', desc: 'Take screenshot', icon: '📸', type: 'capture',
-        params: [
-          { key: 'name', label: '檔名', type: 'text', placeholder: 'screenshot_{timestamp}' },
-          { key: 'full', label: '全頁面', type: 'select', options: ['false','true'] }
-        ]
-      },
-      { id: 'get_url', name: '取得目前URL', desc: 'Get current page URL', icon: '🔗', type: 'extract',
-        params: [
-          { key: 'var', label: '存入變數', type: 'text', placeholder: 'currentUrl' }
-        ]
-      },
-    ]
-  },
-  {
-    group: '等待',
-    items: [
-      { id: 'wait', name: '等待時間', desc: 'Wait for milliseconds', icon: '⏱', type: 'wait',
-        params: [
-          { key: 'ms', label: '毫秒', type: 'text', placeholder: '1000' }
-        ]
-      },
-      { id: 'wait_selector', name: '等待元素', desc: 'Wait for element to appear', icon: '⏳', type: 'wait',
-        params: [
-          { key: 'selector', label: '選擇器', type: 'text', placeholder: '#loading-spinner' },
-          { key: 'state', label: '狀態', type: 'select', options: ['visible','hidden','exists'] },
-          { key: 'timeout', label: '逾時(ms)', type: 'text', placeholder: '10000' }
-        ]
-      },
-      { id: 'wait_url', name: '等待URL變化', desc: 'Wait for URL change', icon: '⏳', type: 'wait',
-        params: [
-          { key: 'contains', label: '包含字串', type: 'text', placeholder: '/dashboard' }
-        ]
-      },
-    ]
-  },
-  {
-    group: '邏輯控制',
-    items: [
-      { id: 'condition', name: '條件判斷', desc: 'If element exists/text matches', icon: '◇', type: 'condition',
-        params: [
-          { key: 'type', label: '類型', type: 'select', options: ['element_exists','text_contains','url_contains','variable_equals'] },
-          { key: 'selector', label: '選擇器/值', type: 'text', placeholder: '#error-msg' },
-          { key: 'value', label: '比較值', type: 'text', placeholder: '（選填）' }
-        ]
-      },
-      { id: 'loop', name: '迴圈', desc: 'Loop N times', icon: '↺', type: 'loop',
-        params: [
-          { key: 'times', label: '次數', type: 'text', placeholder: '5' },
-          { key: 'var', label: '計數器變數', type: 'text', placeholder: 'i' }
-        ]
-      },
-    ]
-  },
-  {
-    group: 'JavaScript',
-    items: [
-      { id: 'js_eval', name: '執行 JS', desc: 'Evaluate JavaScript in page', icon: '⚡', type: 'js',
-        params: [
-          { key: 'code', label: '程式碼', type: 'textarea', placeholder: 'return document.title;' },
-          { key: 'var', label: '存入變數', type: 'text', placeholder: 'result（選填）' }
-        ]
-      },
-      { id: 'js_inject', name: '注入腳本', desc: 'Inject script tag', icon: '📦', type: 'js',
-        params: [
-          { key: 'url', label: '腳本URL', type: 'text', placeholder: 'https://cdn.example.com/lib.js' }
-        ]
-      },
-    ]
-  },
-  {
-    group: 'Cookie / Storage',
-    items: [
-      { id: 'cookie_get', name: '取得 Cookie', desc: 'Get cookie value', icon: '🍪', type: 'cookie',
-        params: [
-          { key: 'name', label: 'Cookie名稱', type: 'text', placeholder: 'session_id' },
-          { key: 'var', label: '存入變數', type: 'text', placeholder: 'cookieVal' }
-        ]
-      },
-      { id: 'cookie_set', name: '設定 Cookie', desc: 'Set a cookie', icon: '🍪', type: 'cookie',
-        params: [
-          { key: 'name', label: 'Cookie名稱', type: 'text', placeholder: 'my_cookie' },
-          { key: 'value', label: '值', type: 'text', placeholder: 'my_value' }
-        ]
-      },
-      { id: 'storage_get', name: '取得 LocalStorage', desc: 'Get localStorage item', icon: '💾', type: 'cookie',
-        params: [
-          { key: 'key', label: 'Key', type: 'text', placeholder: 'token' },
-          { key: 'var', label: '存入變數', type: 'text', placeholder: 'token' }
-        ]
-      },
-    ]
-  },
+  { group:'導覽', items:[
+    { id:'navigate',  name:'開啟網址',   desc:'Navigate to URL',         icon:'🌐', type:'navigate',
+      params:[{key:'url',label:'URL',type:'text',placeholder:'https://example.com'}]},
+    { id:'tab_new',   name:'新增分頁',   desc:'Open new tab',            icon:'＋', type:'tab',
+      params:[{key:'url',label:'URL',type:'text',placeholder:'about:blank'}]},
+    { id:'tab_close', name:'關閉分頁',   desc:'Close current tab',       icon:'✕', type:'tab', params:[]},
+    { id:'reload',    name:'重新整理',   desc:'Reload page',             icon:'↻', type:'navigate', params:[]},
+    { id:'back',      name:'上一頁',     desc:'Go back',                 icon:'←', type:'navigate', params:[]},
+    { id:'forward',   name:'下一頁',     desc:'Go forward',              icon:'→', type:'navigate', params:[]},
+  ]},
+  { group:'互動', items:[
+    { id:'click',     name:'點擊元素',   desc:'Click element',           icon:'👆', type:'click',
+      params:[{key:'selector',label:'選擇器',type:'text',placeholder:'#btn .class [attr]'},{key:'button',label:'按鍵',type:'select',options:['left','right','middle']}]},
+    { id:'dblclick',  name:'雙擊元素',   desc:'Double click',            icon:'👆', type:'click',
+      params:[{key:'selector',label:'選擇器',type:'text',placeholder:'#element'}]},
+    { id:'hover',     name:'懸停元素',   desc:'Hover over element',      icon:'🖱', type:'click',
+      params:[{key:'selector',label:'選擇器',type:'text',placeholder:'#menu'}]},
+    { id:'type',      name:'輸入文字',   desc:'Type into element',       icon:'⌨', type:'input',
+      params:[{key:'selector',label:'選擇器',type:'text',placeholder:'input[name]'},{key:'value',label:'文字',type:'text',placeholder:'輸入內容'},{key:'clear',label:'先清空',type:'select',options:['true','false']}]},
+    { id:'select',    name:'下拉選擇',   desc:'Select dropdown option',  icon:'☰', type:'input',
+      params:[{key:'selector',label:'選擇器',type:'text',placeholder:'select#id'},{key:'value',label:'選項值',type:'text',placeholder:'TW'}]},
+    { id:'key_press', name:'按下按鍵',   desc:'Press keyboard key',      icon:'⌥', type:'input',
+      params:[{key:'key',label:'按鍵',type:'text',placeholder:'Enter, Tab, Escape, F5'}]},
+    { id:'scroll',    name:'捲動頁面',   desc:'Scroll page',             icon:'↕', type:'scroll',
+      params:[{key:'direction',label:'方向',type:'select',options:['down','up','top','bottom']},{key:'amount',label:'距離(px)',type:'text',placeholder:'500'}]},
+    { id:'scroll_to', name:'捲動到元素', desc:'Scroll to element',       icon:'↕', type:'scroll',
+      params:[{key:'selector',label:'選擇器',type:'text',placeholder:'#target'}]},
+  ]},
+  { group:'擷取', items:[
+    { id:'extract_text', name:'擷取文字',   desc:'Get element text',     icon:'📋', type:'extract',
+      params:[{key:'selector',label:'選擇器',type:'text',placeholder:'h1.title'},{key:'var',label:'存入變數',type:'text',placeholder:'result'}]},
+    { id:'extract_attr', name:'擷取屬性',   desc:'Get element attribute',icon:'🏷', type:'extract',
+      params:[{key:'selector',label:'選擇器',type:'text',placeholder:'img.hero'},{key:'attr',label:'屬性名',type:'text',placeholder:'src'},{key:'var',label:'存入變數',type:'text',placeholder:'imgUrl'}]},
+    { id:'get_url',      name:'取得目前URL',desc:'Get current URL',      icon:'🔗', type:'extract',
+      params:[{key:'var',label:'存入變數',type:'text',placeholder:'currentUrl'}]},
+    { id:'screenshot',   name:'截圖',       desc:'Take screenshot',      icon:'📸', type:'capture',
+      params:[{key:'name',label:'檔名',type:'text',placeholder:'screenshot_{timestamp}'},{key:'full',label:'全頁面',type:'select',options:['false','true']}]},
+  ]},
+  { group:'等待', items:[
+    { id:'wait',          name:'等待時間',   desc:'Wait milliseconds',    icon:'⏱', type:'wait',
+      params:[{key:'ms',label:'毫秒',type:'text',placeholder:'1000'}]},
+    { id:'wait_selector', name:'等待元素',   desc:'Wait for element',     icon:'⏳', type:'wait',
+      params:[{key:'selector',label:'選擇器',type:'text',placeholder:'#spinner'},{key:'state',label:'狀態',type:'select',options:['visible','hidden','exists']},{key:'timeout',label:'逾時(ms)',type:'text',placeholder:'10000'}]},
+    { id:'wait_url',      name:'等待URL變化',desc:'Wait for URL change',  icon:'⏳', type:'wait',
+      params:[{key:'contains',label:'包含字串',type:'text',placeholder:'/dashboard'}]},
+  ]},
+  { group:'邏輯', items:[
+    { id:'condition', name:'條件判斷', desc:'If element/text/url matches', icon:'◇', type:'condition',
+      params:[{key:'type',label:'類型',type:'select',options:['element_exists','text_contains','url_contains','variable_equals']},{key:'selector',label:'選擇器/值',type:'text',placeholder:'#error'},{key:'value',label:'比較值',type:'text',placeholder:'（選填）'}]},
+    { id:'loop',      name:'迴圈',     desc:'Loop N times',               icon:'↺', type:'loop',
+      params:[{key:'times',label:'次數',type:'text',placeholder:'5'},{key:'var',label:'計數變數',type:'text',placeholder:'i'}]},
+  ]},
+  { group:'JavaScript', items:[
+    { id:'js_eval',   name:'執行 JS',  desc:'Evaluate JavaScript',  icon:'⚡', type:'js',
+      params:[{key:'code',label:'程式碼',type:'textarea',placeholder:'return document.title;'},{key:'var',label:'存入變數',type:'text',placeholder:'result（選填）'}]},
+    { id:'js_inject', name:'注入腳本', desc:'Inject script tag',    icon:'📦', type:'js',
+      params:[{key:'url',label:'腳本URL',type:'text',placeholder:'https://cdn.example.com/lib.js'}]},
+  ]},
+  { group:'Cookie / Storage', items:[
+    { id:'cookie_get',  name:'取得 Cookie',      desc:'Get cookie value',       icon:'🍪', type:'cookie',
+      params:[{key:'name',label:'Cookie名稱',type:'text',placeholder:'session_id'},{key:'var',label:'存入變數',type:'text',placeholder:'cookieVal'}]},
+    { id:'cookie_set',  name:'設定 Cookie',      desc:'Set a cookie',           icon:'🍪', type:'cookie',
+      params:[{key:'name',label:'Cookie名稱',type:'text',placeholder:'my_cookie'},{key:'value',label:'值',type:'text',placeholder:'my_value'}]},
+    { id:'storage_get', name:'取得 LocalStorage',desc:'Get localStorage item',  icon:'💾', type:'cookie',
+      params:[{key:'key',label:'Key',type:'text',placeholder:'token'},{key:'var',label:'存入變數',type:'text',placeholder:'token'}]},
+  ]},
+];
+
+const BUILTIN_SCRIPTS = [
+  { id:'b1', name:'① 打開 Gemini 並問候', icon:'🤖', steps:[
+    {cmdId:'navigate',      values:{url:'https://gemini.google.com'}},
+    {cmdId:'wait_selector', values:{selector:'.ql-editor',state:'visible',timeout:'15000'}},
+    {cmdId:'wait',          values:{ms:'2000'}},
+    {cmdId:'click',         values:{selector:'.ql-editor',button:'left'}},
+    {cmdId:'type',          values:{selector:'.ql-editor',value:'你好 Gemini！這是來自 MCP RPA 控制器的自動測試訊息，請簡短回覆。',clear:'true'}},
+    {cmdId:'key_press',     values:{key:'Enter'}},
+    {cmdId:'wait',          values:{ms:'5000'}},
+    {cmdId:'screenshot',    values:{name:'gemini_greeting',full:'false'}},
+  ]},
+  { id:'b2', name:'② Gemini 自動提問', icon:'💬', steps:[
+    {cmdId:'wait_selector', values:{selector:'.ql-editor',state:'visible',timeout:'10000'}},
+    {cmdId:'click',         values:{selector:'.ql-editor',button:'left'}},
+    {cmdId:'type',          values:{selector:'.ql-editor',value:'請用繁體中文解釋：什麼是 MCP（Model Context Protocol）？',clear:'true'}},
+    {cmdId:'wait',          values:{ms:'500'}},
+    {cmdId:'key_press',     values:{key:'Enter'}},
+    {cmdId:'wait',          values:{ms:'5000'}},
+    {cmdId:'scroll',        values:{direction:'bottom',amount:''}},
+    {cmdId:'screenshot',    values:{name:'gemini_answer',full:'true'}},
+  ]},
+  { id:'b3', name:'③ Gemini 開新對話', icon:'🔄', steps:[
+    {cmdId:'navigate',      values:{url:'https://gemini.google.com'}},
+    {cmdId:'wait',          values:{ms:'3000'}},
+    {cmdId:'wait_selector', values:{selector:'.ql-editor',state:'visible',timeout:'15000'}},
+    {cmdId:'screenshot',    values:{name:'gemini_newchat_ready',full:'false'}},
+  ]},
+  { id:'b4', name:'④ 擷取 Gemini 回覆', icon:'📋', steps:[
+    {cmdId:'wait_selector', values:{selector:'model-response',state:'visible',timeout:'15000'}},
+    {cmdId:'scroll',        values:{direction:'bottom',amount:''}},
+    {cmdId:'wait',          values:{ms:'1000'}},
+    {cmdId:'extract_text',  values:{selector:'model-response:last-child',var:'geminiReply'}},
+    {cmdId:'screenshot',    values:{name:'gemini_extracted',full:'false'}},
+  ]},
+  { id:'b5', name:'⑤ 多輪對話流程', icon:'🗣', steps:[
+    {cmdId:'navigate',      values:{url:'https://gemini.google.com'}},
+    {cmdId:'wait_selector', values:{selector:'.ql-editor',state:'visible',timeout:'15000'}},
+    {cmdId:'wait',          values:{ms:'2000'}},
+    {cmdId:'click',         values:{selector:'.ql-editor',button:'left'}},
+    {cmdId:'type',          values:{selector:'.ql-editor',value:'請列出 3 個 AI 在日常生活中的應用例子。',clear:'true'}},
+    {cmdId:'key_press',     values:{key:'Enter'}},
+    {cmdId:'wait',          values:{ms:'6000'}},
+    {cmdId:'click',         values:{selector:'.ql-editor',button:'left'}},
+    {cmdId:'type',          values:{selector:'.ql-editor',value:'針對你提到的第一個例子，請再深入說明。',clear:'true'}},
+    {cmdId:'key_press',     values:{key:'Enter'}},
+    {cmdId:'wait',          values:{ms:'6000'}},
+    {cmdId:'scroll',        values:{direction:'bottom',amount:''}},
+    {cmdId:'screenshot',    values:{name:'gemini_multi_round',full:'true'}},
+  ]},
 ];
 
 // ═══════════════════════════════════════════
-//  STATE
+// 2. STATE
 // ═══════════════════════════════════════════
 
-let steps = [];
-let scriptLibrary = JSON.parse(localStorage.getItem('mcp_rpa_library') || '[]');
-let isRunning = false;
-let shouldStop = false;
-let currentStepIdx = -1;
-let mcpConnected = false;
-let ws = null;
-let variables = {};
-let dragSrcId = null;
+let steps       = [];
+let userLib     = JSON.parse(localStorage.getItem('mcp_rpa_lib') || '[]');
+let variables   = {};
+let isRunning   = false;
+let isPaused    = false;
+let shouldStop  = false;
+let curStepIdx  = -1;
+let execMode    = 'simulate';  // 'simulate' | 'extension' | 'cdp'
+let cdpWs       = null;
+let cdpConnected= false;
+let dragSrcId   = null;
+let logs        = [];
+let cfgDelay    = 800;
+let cfgTimeout  = 15000;
+let cfgError    = 'stop';
+window.__extDetected = false;
 
 // ═══════════════════════════════════════════
-//  INIT
+// 3. INIT
 // ═══════════════════════════════════════════
 
 function init() {
-  renderCommands(COMMANDS);
-  renderScriptLibrary();
-  addLog('SYS', 'MCP RPA 控制器啟動');
-  addLog('SYS', '請至 MCP 設定 → 輸入 Chrome 除錯端點 → 連線');
-
-  // Drop zone events
-  const dz = document.getElementById('dropZone');
-  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
-  dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
-  dz.addEventListener('drop', e => {
-    e.preventDefault();
-    dz.classList.remove('drag-over');
-    if (dragSrcId) addStep(dragSrcId);
-  });
+  renderCmds();
+  renderBuiltins();
+  renderUserLib();
+  setupDropZone();
+  addLog('SYS','MCP RPA Controller v2.0 All-in-One 啟動');
+  addLog('SYS','→ 底部選擇執行模式；EXT 模式需安裝 Extension（見「Extension 安裝」頁）');
+  addLog('SYS','→ 腳本庫已內建 5 個 Gemini 對話腳本，點擊即可載入');
+  // Ping extension
+  setTimeout(()=>{ window.postMessage({type:'MCP_RPA_PING',from:'page'},'*'); },1000);
 }
 
 // ═══════════════════════════════════════════
-//  COMMAND PANEL
+// 4. COMMAND PANEL
 // ═══════════════════════════════════════════
 
-function renderCommands(data) {
-  const list = document.getElementById('commandList');
-  const q = (document.getElementById('cmdSearch')?.value || '').toLowerCase();
+function findCmd(id){ for(const g of COMMANDS){ const c=g.items.find(x=>x.id===id); if(c) return c; } return null; }
+
+function renderCmds(){
+  const q = document.getElementById('cmdSearch').value.toLowerCase();
+  const list = document.getElementById('cmdList');
   list.innerHTML = '';
   let total = 0;
-
-  data.forEach(group => {
-    const filtered = group.items.filter(c =>
-      c.name.toLowerCase().includes(q) || c.desc.toLowerCase().includes(q)
-    );
-    if (!filtered.length) return;
-    total += filtered.length;
-
-    const label = document.createElement('div');
-    label.className = 'cmd-group-label';
-    label.textContent = group.group;
-    list.appendChild(label);
-
-    filtered.forEach(cmd => {
+  COMMANDS.forEach(g => {
+    const items = g.items.filter(c=>!q||c.name.toLowerCase().includes(q)||c.desc.toLowerCase().includes(q));
+    if(!items.length) return;
+    total += items.length;
+    const lbl = document.createElement('div');
+    lbl.className = 'g-label'; lbl.textContent = g.group;
+    list.appendChild(lbl);
+    items.forEach(cmd => {
       const el = document.createElement('div');
-      el.className = 'cmd-item';
-      el.draggable = true;
-      el.innerHTML = `
-        <div class="cmd-icon type-${cmd.type}">${cmd.icon}</div>
-        <div class="cmd-info">
-          <div class="cmd-name">${cmd.name}</div>
-          <div class="cmd-desc">${cmd.desc}</div>
-        </div>
-        <div class="cmd-add">+</div>
-      `;
-      el.addEventListener('dragstart', () => { dragSrcId = cmd.id; el.classList.add('dragging-source'); });
-      el.addEventListener('dragend', () => { dragSrcId = null; el.classList.remove('dragging-source'); });
-      el.querySelector('.cmd-add').addEventListener('click', (e) => { e.stopPropagation(); addStep(cmd.id); });
+      el.className = 'cmd-item'; el.draggable = true;
+      el.innerHTML = `<div class="cmd-icon t-${cmd.type}">${cmd.icon}</div>
+        <div class="cmd-info"><div class="cmd-name">${cmd.name}</div><div class="cmd-desc">${cmd.desc}</div></div>
+        <div class="cmd-plus">+</div>`;
+      el.addEventListener('dragstart',()=>{ dragSrcId=cmd.id; el.style.opacity='.3'; });
+      el.addEventListener('dragend',()=>{ dragSrcId=null; el.style.opacity=''; });
+      el.querySelector('.cmd-plus').addEventListener('click', e=>{ e.stopPropagation(); addStep(cmd.id); });
       list.appendChild(el);
     });
   });
-
-  document.getElementById('cmdCount').textContent = total;
-}
-
-function filterCommands() {
-  renderCommands(COMMANDS);
+  document.getElementById('cmdBadge').textContent = total;
 }
 
 // ═══════════════════════════════════════════
-//  FIND COMMAND
+// 5. STEP EDITOR
 // ═══════════════════════════════════════════
 
-function findCmd(id) {
-  for (const g of COMMANDS) {
-    const c = g.items.find(x => x.id === id);
-    if (c) return c;
-  }
-  return null;
-}
-
-// ═══════════════════════════════════════════
-//  STEP MANAGEMENT
-// ═══════════════════════════════════════════
-
-function addStep(cmdId) {
-  const cmd = findCmd(cmdId);
-  if (!cmd) return;
-  const step = {
-    id: Date.now() + Math.random(),
-    cmdId,
-    values: {}
-  };
-  cmd.params.forEach(p => { step.values[p.key] = p.placeholder || ''; });
+function addStep(cmdId){
+  const cmd = findCmd(cmdId); if(!cmd) return;
+  const step = { id: Date.now()+Math.random(), cmdId, values:{}, status:'' };
+  cmd.params.forEach(p=>{ step.values[p.key] = p.placeholder||''; });
   steps.push(step);
   renderSteps();
-  addLog('SYS', `新增步驟：${cmd.name}`);
+  addLog('SYS',`+ ${cmd.name}`);
 }
 
-function removeStep(id) {
-  steps = steps.filter(s => s.id !== id);
-  renderSteps();
-}
+function removeStep(id){ steps=steps.filter(s=>s.id!=id); renderSteps(); }
+function updateVal(id,key,val){ const s=steps.find(s=>s.id==id); if(s) s.values[key]=val; }
 
-function renderSteps() {
+function renderSteps(){
   const list = document.getElementById('stepsList');
-  const dz = document.getElementById('dropZone');
-
-  if (!steps.length) {
-    list.innerHTML = '';
-    dz.style.display = 'block';
-    return;
-  }
-
-  dz.style.display = 'none';
+  const dz   = document.getElementById('dropZone');
+  dz.style.display = steps.length ? 'none' : '';
   list.innerHTML = '';
-
-  steps.forEach((step, idx) => {
-    const cmd = findCmd(step.cmdId);
-    if (!cmd) return;
-
+  steps.forEach((step,i)=>{
+    const cmd = findCmd(step.cmdId); if(!cmd) return;
     const card = document.createElement('div');
-    card.className = 'step-card';
-    card.dataset.id = step.id;
-
-    // Classes
-    if (idx === currentStepIdx && isRunning) card.classList.add('active-step');
-    if (step.status === 'done') card.classList.add('done-step');
-    if (step.status === 'error') card.classList.add('error-step');
-
-    const paramsHtml = cmd.params.map(p => {
-      if (p.type === 'textarea') {
-        return `<div class="step-param">
-          <label>${p.label}</label>
-          <textarea oninput="updateStepValue('${step.id}','${p.key}',this.value)">${step.values[p.key] || ''}</textarea>
-        </div>`;
-      } else if (p.type === 'select') {
-        const opts = p.options.map(o => `<option ${step.values[p.key]===o?'selected':''}>${o}</option>`).join('');
-        return `<div class="step-param">
-          <label>${p.label}</label>
-          <select onchange="updateStepValue('${step.id}','${p.key}',this.value)">${opts}</select>
-        </div>`;
-      } else {
-        return `<div class="step-param">
-          <label>${p.label}</label>
-          <input type="text" value="${step.values[p.key] || ''}" placeholder="${p.placeholder || ''}"
-            oninput="updateStepValue('${step.id}','${p.key}',this.value)">
-        </div>`;
-      }
+    card.className = 'step-card'
+      + (i===curStepIdx&&isRunning?' active':'')
+      + (step.status==='done'?' done':'')
+      + (step.status==='error'?' error':'');
+    const paramsHtml = cmd.params.map(p=>{
+      const v = step.values[p.key]||'';
+      if(p.type==='textarea') return `<div class="sp"><label>${p.label}</label><textarea oninput="updateVal(${step.id},'${p.key}',this.value)">${v}</textarea></div>`;
+      if(p.type==='select')   return `<div class="sp"><label>${p.label}</label><select onchange="updateVal(${step.id},'${p.key}',this.value)">${p.options.map(o=>`<option${v===o?' selected':''}>${o}</option>`).join('')}</select></div>`;
+      return `<div class="sp"><label>${p.label}</label><input type="text" value="${v.replace(/"/g,'&quot;')}" placeholder="${p.placeholder||''}" oninput="updateVal(${step.id},'${p.key}',this.value)"></div>`;
     }).join('');
-
-    const statusIcon = step.status === 'done' ? '✓' : step.status === 'error' ? '✗' : '';
-
+    const stateIcon = step.status==='done'?'<span style="color:var(--gn)">✓</span>':step.status==='error'?'<span style="color:var(--rd)">✗</span>':'';
     card.innerHTML = `
-      <div class="step-num">${idx+1}</div>
-      <div class="step-icon type-${cmd.type}">${cmd.icon}</div>
+      <div class="step-num">${i+1}</div>
+      <div class="step-ico t-${cmd.type}">${cmd.icon}</div>
       <div class="step-content">
-        <div class="step-type type-${cmd.type}">${cmd.name}</div>
+        <div class="step-type t-${cmd.type}">${cmd.name}</div>
         <div class="step-params">${paramsHtml}</div>
       </div>
       <div class="step-actions">
-        <span class="step-drag-handle" draggable="true" title="拖曳排序">⠿</span>
-        <button class="step-delete" onclick="removeStep(${step.id})" title="刪除">✕</button>
+        <span class="step-drag" draggable="true">⠿</span>
+        <button class="step-del" onclick="removeStep(${step.id})">✕</button>
       </div>
-      <div class="step-status">${statusIcon}</div>
-    `;
-
-    // Drag reorder
-    const handle = card.querySelector('.step-drag-handle');
-    handle.addEventListener('dragstart', (e) => {
-      e.dataTransfer.setData('stepId', step.id);
-      card.classList.add('dragging-source');
+      <div class="step-state">${stateIcon}</div>`;
+    // drag reorder
+    const handle = card.querySelector('.step-drag');
+    handle.addEventListener('dragstart',e=>{ e.dataTransfer.setData('stepId',step.id); card.style.opacity='.3'; });
+    handle.addEventListener('dragend',  ()=>{ card.style.opacity=''; });
+    card.addEventListener('dragover', e=>{ e.preventDefault(); card.classList.add('active'); });
+    card.addEventListener('dragleave',  ()=>{ card.classList.remove('active'); });
+    card.addEventListener('drop', e=>{
+      e.preventDefault(); card.classList.remove('active');
+      const sid = parseFloat(e.dataTransfer.getData('stepId'));
+      if(!sid||sid===step.id) return;
+      const si = steps.findIndex(s=>s.id===sid), ti = steps.findIndex(s=>s.id===step.id);
+      const [m] = steps.splice(si,1); steps.splice(ti,0,m); renderSteps();
     });
-    handle.addEventListener('dragend', () => card.classList.remove('dragging-source'));
-    card.addEventListener('dragover', e => { e.preventDefault(); card.classList.add('drag-over'); });
-    card.addEventListener('dragleave', () => card.classList.remove('drag-over'));
-    card.addEventListener('drop', e => {
-      e.preventDefault();
-      card.classList.remove('drag-over');
-      const srcId = parseFloat(e.dataTransfer.getData('stepId'));
-      if (!srcId || srcId === step.id) return;
-      const srcIdx = steps.findIndex(s => s.id === srcId);
-      const tgtIdx = steps.findIndex(s => s.id === step.id);
-      const [moved] = steps.splice(srcIdx, 1);
-      steps.splice(tgtIdx, 0, moved);
-      renderSteps();
-    });
-
     list.appendChild(card);
   });
 }
 
-function updateStepValue(stepId, key, val) {
-  const step = steps.find(s => s.id == stepId);
-  if (step) step.values[key] = val;
+function setupDropZone(){
+  const dz = document.getElementById('dropZone');
+  dz.addEventListener('dragover', e=>{ e.preventDefault(); dz.classList.add('hover'); });
+  dz.addEventListener('dragleave',()=>{ dz.classList.remove('hover'); });
+  dz.addEventListener('drop', e=>{ e.preventDefault(); dz.classList.remove('hover'); if(dragSrcId) addStep(dragSrcId); });
 }
 
-function clearSteps() {
-  if (steps.length && !confirm('確定清空所有步驟？')) return;
-  steps = [];
-  currentStepIdx = -1;
+function clearSteps(){ if(steps.length&&!confirm('確定清空所有步驟？')) return; steps=[]; curStepIdx=-1; renderSteps(); }
+
+// ═══════════════════════════════════════════
+// 6. EXECUTION ENGINE (ROUTER)
+// ═══════════════════════════════════════════
+
+async function runScript(){
+  if(!steps.length){ addLog('WARN','無可執行步驟'); return; }
+  if(isRunning) return;
+  isRunning=true; shouldStop=false; isPaused=false; curStepIdx=-1; variables={};
+  steps.forEach(s=>{ s.status=''; });
   renderSteps();
-}
+  document.getElementById('runBtn').style.display='none';
+  document.getElementById('stopBtn').style.display='';
+  document.getElementById('pauseBtn').style.display='';
+  document.getElementById('runBar').classList.add('on');
+  setStatus('running','執行中...');
+  const name = document.getElementById('scriptName').value;
+  addLog('INFO',`▶ 開始：${name}（${steps.length} 步）[${execMode}]`);
 
-// ═══════════════════════════════════════════
-//  EXECUTION ENGINE
-// ═══════════════════════════════════════════
+  cfgDelay   = parseInt(document.getElementById('cfDelay').value)||800;
+  cfgTimeout = parseInt(document.getElementById('cfTimeout').value)||15000;
+  cfgError   = document.getElementById('cfError').value||'stop';
 
-async function runScript() {
-  if (!steps.length) { addLog('WARN', '無可執行步驟'); return; }
-  if (isRunning) return;
-
-  isRunning = true;
-  shouldStop = false;
-  currentStepIdx = -1;
-  variables = {};
-
-  steps.forEach(s => { s.status = ''; });
-
-  document.getElementById('runBtn').style.display = 'none';
-  document.getElementById('stopBtn').style.display = '';
-  document.getElementById('runningIndicator').classList.add('active');
-  setStatus('running', '執行中...');
-
-  addLog('INFO', `▶ 開始執行：${document.getElementById('scriptName').value}`);
-  addLog('INFO', `共 ${steps.length} 個步驟`);
-
-  const delay = parseInt(document.getElementById('stepDelay')?.value) ||
-                parseInt(document.getElementById('execSpeed')?.value) || 500;
-
-  for (let i = 0; i < steps.length; i++) {
-    if (shouldStop) {
-      addLog('WARN', '⏸ 執行已停止');
-      break;
-    }
-
-    currentStepIdx = i;
+  for(let i=0;i<steps.length;i++){
+    if(shouldStop){ addLog('WARN','⏸ 已停止'); break; }
+    while(isPaused){ await sleep(200); if(shouldStop) break; }
+    curStepIdx=i;
     renderSteps();
-    updateProgress(i, steps.length);
-
-    const step = steps[i];
-    const cmd = findCmd(step.cmdId);
-
-    addLog('INFO', `[${i+1}/${steps.length}] ${cmd.name}`);
-
-    try {
-      await simulateExecute(step, cmd, i);
-      step.status = 'done';
-      addLog('OK', `✓ 完成：${cmd.name}`);
-    } catch(err) {
-      step.status = 'error';
-      addLog('ERR', `✗ 錯誤：${err.message}`);
-      const errHandling = document.getElementById('errorHandling')?.value || 'stop';
-      if (errHandling === 'stop') {
-        addLog('ERR', '遇錯停止執行');
-        break;
+    updateProgress(i,steps.length);
+    const step=steps[i], cmd=findCmd(step.cmdId);
+    addLog('INFO',`[${i+1}/${steps.length}] ${stepLabel(step)}`);
+    let ok=false;
+    try{
+      await dispatch(step);
+      step.status='done'; ok=true;
+      addLog('OK','✓ 完成');
+    }catch(err){
+      step.status='error';
+      addLog('ERR',`✗ ${err.message}`);
+      if(cfgError==='stop'){ addLog('ERR','遇錯停止'); break; }
+      if(cfgError==='retry'){
+        addLog('WARN','重試中...');
+        try{ await sleep(1000); await dispatch(step); step.status='done'; addLog('OK','✓ 重試成功'); }
+        catch(e2){ addLog('ERR',`重試失敗：${e2.message}`); }
       }
     }
-
     renderSteps();
-    if (i < steps.length - 1) await sleep(delay);
+    if(i<steps.length-1&&!shouldStop) await sleep(cfgDelay);
   }
-
-  finishExecution();
+  finishExec();
 }
 
-async function simulateExecute(step, cmd, idx) {
-  // Simulate MCP command execution
-  // In real deployment, these would call Chrome DevTools Protocol via MCP
-  const v = step.values;
+async function dispatch(step){
+  if(execMode==='extension') return await extExec(step);
+  if(execMode==='cdp'&&cdpConnected) return await cdpExec(step);
+  return await simExec(step);
+}
 
-  switch (step.cmdId) {
+function stopScript(){ shouldStop=true; addLog('WARN','⏸ 停止請求...'); }
+function pauseScript(){
+  isPaused=!isPaused;
+  document.getElementById('pauseBtn').textContent=isPaused?'▶ 繼續':'⏸ 暫停';
+  setStatus(isPaused?'idle':'running',isPaused?'已暫停':'執行中...');
+}
+
+async function stepOnce(){
+  if(!steps.length) return;
+  if(curStepIdx>=steps.length-1){ curStepIdx=-1; steps.forEach(s=>s.status=''); }
+  curStepIdx++;
+  const step=steps[curStepIdx], cmd=findCmd(step.cmdId);
+  addLog('INFO',`[單步 ${curStepIdx+1}] ${stepLabel(step)}`);
+  try{ await dispatch(step); step.status='done'; addLog('OK','✓'); }
+  catch(e){ step.status='error'; addLog('ERR',`✗ ${e.message}`); }
+  updateProgress(curStepIdx+1,steps.length);
+  renderSteps();
+}
+
+function finishExec(){
+  isRunning=false; curStepIdx=-1; isPaused=false;
+  document.getElementById('runBtn').style.display='';
+  document.getElementById('stopBtn').style.display='none';
+  document.getElementById('pauseBtn').style.display='none';
+  document.getElementById('pauseBtn').textContent='⏸ 暫停';
+  document.getElementById('runBar').classList.remove('on');
+  setStatus(cdpConnected?'connected':execMode==='extension'&&window.__extDetected?'connected':'idle',
+    execMode==='extension'?'Extension 完成':execMode==='cdp'?'CDP 完成':'模擬完成');
+  addLog('OK','▣ 執行完畢');
+  renderSteps();
+  renderVars();
+}
+
+function updateProgress(cur,total){
+  const pct=total?Math.round(cur/total*100):0;
+  document.getElementById('progFill').style.width=pct+'%';
+  document.getElementById('execInfo').textContent=`${cur}/${total}`;
+}
+
+function renderVars(){
+  const wrap=document.getElementById('varsWrap');
+  const disp=document.getElementById('varsDisplay');
+  const keys=Object.keys(variables);
+  if(!keys.length){ wrap.style.display='none'; return; }
+  wrap.style.display='';
+  disp.innerHTML=keys.map(k=>`<div class="var-row"><span class="var-key">${k}</span><span class="var-val">${JSON.stringify(variables[k]).slice(0,80)}</span></div>`).join('');
+}
+
+// ═══════════════════════════════════════════
+// 7. SIMULATE ENGINE
+// ═══════════════════════════════════════════
+
+async function simExec(step){
+  const v=step.values||{};
+  const msgs={
+    navigate:`→ 導覽 ${v.url}`, click:`→ 點擊 ${v.selector}`, dblclick:`→ 雙擊 ${v.selector}`,
+    hover:`→ 懸停 ${v.selector}`, type:`→ 輸入 "${(v.value||'').slice(0,30)}" → ${v.selector}`,
+    select:`→ 選擇 ${v.value}`, key_press:`→ 按 ${v.key}`,
+    scroll:`→ 捲動 ${v.direction}`, scroll_to:`→ 捲到 ${v.selector}`,
+    wait:`→ 等待 ${v.ms}ms`, wait_selector:`→ 等待[${v.state}] ${v.selector}`,
+    wait_url:`→ 等待URL含 ${v.contains}`,
+    extract_text:`→ 擷取 ${v.selector} → ${v.var}`, extract_attr:`→ 擷取屬性 → ${v.var}`,
+    get_url:`→ 取得URL → ${v.var}`, screenshot:`→ 截圖 ${v.name}`,
+    js_eval:`→ 執行JS`, js_inject:`→ 注入 ${v.url}`,
+    cookie_get:`→ Cookie ${v.name}`, cookie_set:`→ 設Cookie ${v.name}=${v.value}`,
+    storage_get:`→ Storage ${v.key}`, condition:`→ 條件[${v.type}]`, loop:`→ 迴圈×${v.times}`,
+    reload:`→ 重整`, back:`→ 上一頁`, forward:`→ 下一頁`,
+    tab_new:`→ 新分頁`, tab_close:`→ 關閉分頁`,
+  };
+  addLog('SYS', msgs[step.cmdId]||`→ ${step.cmdId}`);
+  if(step.cmdId==='wait') await sleep(Math.min(parseInt(v.ms)||1000,2000));
+  else await sleep(100+Math.random()*100);
+}
+
+// ═══════════════════════════════════════════
+// 8. CDP ENGINE
+// ═══════════════════════════════════════════
+
+async function cdpExec(step){
+  const v=step.values||{};
+  switch(step.cmdId){
     case 'navigate':
-      if (!v.url) throw new Error('URL 不可為空');
-      addLog('INFO', `→ 導覽至 ${v.url}`);
-      await mcpCall('Page.navigate', { url: v.url });
-      break;
-    case 'click':
-      if (!v.selector) throw new Error('選擇器不可為空');
-      addLog('INFO', `→ 點擊 ${v.selector}`);
-      await mcpCall('Runtime.evaluate', { expression: `document.querySelector('${v.selector}').click()` });
-      break;
-    case 'dblclick':
-      if (!v.selector) throw new Error('選擇器不可為空');
-      addLog('INFO', `→ 雙擊 ${v.selector}`);
-      break;
+      if(!v.url) throw new Error('URL 不可空');
+      addLog('SYS',`→ 導覽 ${v.url}`);
+      await cdp('Page.navigate',{url:v.url}); await sleep(1800); break;
+    case 'click': case 'dblclick': case 'hover':
+      if(!v.selector) throw new Error('選擇器不可空');
+      await cdp('Runtime.evaluate',{expression:`(()=>{
+        const el=document.querySelector(${JSON.stringify(v.selector)});
+        if(!el) throw new Error('找不到：${v.selector.replace(/'/g,"\\'").replace(/\n/g,'')}');
+        el.scrollIntoView({behavior:'smooth',block:'center'});
+        ${ step.cmdId==='dblclick' ? "el.dispatchEvent(new MouseEvent('dblclick',{bubbles:true}));"
+         : step.cmdId==='hover'   ? "el.dispatchEvent(new MouseEvent('mouseover',{bubbles:true}));"
+         : "el.click();" }
+      })()`,returnByValue:true}); break;
     case 'type':
-      if (!v.selector) throw new Error('選擇器不可為空');
-      addLog('INFO', `→ 輸入 "${v.value}" 到 ${v.selector}`);
-      await mcpCall('Runtime.evaluate', {
-        expression: `(function(){var el=document.querySelector('${v.selector}');if(!el)throw new Error('找不到元素');if('${v.clear}'==='true')el.value='';el.value+='${v.value}';el.dispatchEvent(new Event('input'));el.dispatchEvent(new Event('change'));})()`
-      });
-      break;
-    case 'wait':
-      const ms = parseInt(v.ms) || 1000;
-      addLog('INFO', `→ 等待 ${ms}ms`);
-      await sleep(ms);
-      break;
-    case 'wait_selector':
-      addLog('INFO', `→ 等待元素 ${v.selector} [${v.state||'visible'}]`);
-      await sleep(800);
-      break;
-    case 'screenshot':
-      addLog('INFO', `→ 截圖：${v.name || 'screenshot'}`);
-      await mcpCall('Page.captureScreenshot', { format: 'png', fullPage: v.full === 'true' });
-      break;
-    case 'js_eval':
-      addLog('INFO', `→ 執行 JS`);
-      const result = await mcpCall('Runtime.evaluate', { expression: v.code, returnByValue: true });
-      if (v.var && result) variables[v.var] = result;
-      break;
-    case 'extract_text':
-      addLog('INFO', `→ 擷取 ${v.selector} 的文字`);
-      const txt = await mcpCall('Runtime.evaluate', {
-        expression: `document.querySelector('${v.selector}')?.textContent || ''`
-      });
-      if (v.var) variables[v.var] = txt;
-      break;
-    case 'scroll':
-      addLog('INFO', `→ 捲動 ${v.direction} ${v.amount||''}px`);
-      const scrollMap = { down: `window.scrollBy(0,${v.amount||500})`, up: `window.scrollBy(0,-${v.amount||500})`, top: 'window.scrollTo(0,0)', bottom: 'window.scrollTo(0,document.body.scrollHeight)' };
-      await mcpCall('Runtime.evaluate', { expression: scrollMap[v.direction||'down'] });
-      break;
-    case 'reload':
-      addLog('INFO', `→ 重新整理頁面`);
-      await mcpCall('Page.reload', {});
-      break;
+      if(!v.selector) throw new Error('選擇器不可空');
+      await cdp('Runtime.evaluate',{expression:`(()=>{
+        const el=document.querySelector(${JSON.stringify(v.selector)});
+        if(!el) throw new Error('找不到元素');
+        el.focus();
+        if(${v.clear==='true'}) el.value=el.textContent='';
+        if(el.contentEditable==='true'){el.textContent=${JSON.stringify(v.value||'')};el.dispatchEvent(new InputEvent('input',{bubbles:true}));}
+        else{el.value=${JSON.stringify(v.value||'')};el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));}
+      })()`,returnByValue:true}); break;
     case 'key_press':
-      addLog('INFO', `→ 按下 ${v.key}`);
+      await cdp('Runtime.evaluate',{expression:`(()=>{
+        const el=document.activeElement||document.body;
+        const o={key:${JSON.stringify(v.key||'Enter')},bubbles:true};
+        el.dispatchEvent(new KeyboardEvent('keydown',o));
+        el.dispatchEvent(new KeyboardEvent('keypress',o));
+        el.dispatchEvent(new KeyboardEvent('keyup',o));
+        if(o.key==='Enter'){const f=el.closest('form');if(f)f.dispatchEvent(new Event('submit',{bubbles:true}));}
+      })()`,returnByValue:true}); break;
+    case 'scroll': {
+      const px=parseInt(v.amount)||500;
+      const expr={down:`window.scrollBy(0,${px})`,up:`window.scrollBy(0,-${px})`,top:`window.scrollTo(0,0)`,bottom:`window.scrollTo(0,document.body.scrollHeight)`};
+      await cdp('Runtime.evaluate',{expression:expr[v.direction||'down']}); break;
+    }
+    case 'scroll_to':
+      await cdp('Runtime.evaluate',{expression:`document.querySelector(${JSON.stringify(v.selector)})?.scrollIntoView({behavior:'smooth',block:'center'})`}); break;
+    case 'wait':
+      addLog('SYS',`→ 等待 ${v.ms}ms`); await sleep(parseInt(v.ms)||1000); break;
+    case 'wait_selector': {
+      const st=v.state||'visible'; const to=parseInt(v.timeout)||cfgTimeout;
+      addLog('SYS',`→ 等待[${st}] ${v.selector}`);
+      await cdpPoll(`(()=>{const el=document.querySelector(${JSON.stringify(v.selector)});if('${st}'==='exists')return!!el;if('${st}'==='hidden')return!el||el.offsetParent===null;return!!el&&el.offsetParent!==null;})()`,to); break;
+    }
+    case 'wait_url':
+      await cdpPoll(`location.href.includes(${JSON.stringify(v.contains||'')})`,cfgTimeout); break;
+    case 'extract_text': {
+      const r=await cdp('Runtime.evaluate',{expression:`(document.querySelector(${JSON.stringify(v.selector)})?.textContent||'').trim()`,returnByValue:true});
+      const txt=r?.result?.value||'';
+      if(v.var){variables[v.var]=txt;addLog('SYS',`${v.var}="${txt.slice(0,60)}"`);}
       break;
-    case 'get_url':
-      addLog('INFO', `→ 取得目前 URL`);
-      if (v.var) variables[v.var] = window.location.href;
+    }
+    case 'extract_attr': {
+      const r=await cdp('Runtime.evaluate',{expression:`document.querySelector(${JSON.stringify(v.selector)})?.getAttribute(${JSON.stringify(v.attr||'href')})`,returnByValue:true});
+      if(v.var){variables[v.var]=r?.result?.value||'';addLog('SYS',`${v.var}="${variables[v.var]}"`);}
       break;
+    }
+    case 'get_url': {
+      const r=await cdp('Runtime.evaluate',{expression:'location.href',returnByValue:true});
+      if(v.var){variables[v.var]=r?.result?.value||'';addLog('SYS',`${v.var}="${variables[v.var]}"`);}
+      break;
+    }
+    case 'js_eval': {
+      if(!v.code) throw new Error('JS 不可空');
+      const r=await cdp('Runtime.evaluate',{expression:`(function(){${v.code}})()`,returnByValue:true});
+      if(v.var&&r?.result?.value!==undefined){variables[v.var]=r.result.value;addLog('SYS',`${v.var}=${JSON.stringify(r.result.value).slice(0,60)}`);}
+      break;
+    }
+    case 'screenshot': {
+      const r=await cdp('Page.captureScreenshot',{format:'png',captureBeyondViewport:v.full==='true'});
+      if(r?.data){
+        const a=document.createElement('a');
+        a.href='data:image/png;base64,'+r.data;
+        a.download=(v.name||'screenshot').replace('{timestamp}',Date.now())+'.png';
+        a.click();
+        addLog('OK',`截圖下載：${a.download}`);
+      }
+      break;
+    }
+    case 'reload': await cdp('Page.reload',{}); await sleep(1500); break;
+    case 'back':   await cdp('Runtime.evaluate',{expression:'history.back()'}); await sleep(1500); break;
+    case 'forward':await cdp('Runtime.evaluate',{expression:'history.forward()'}); await sleep(1500); break;
+    case 'select':
+      await cdp('Runtime.evaluate',{expression:`(()=>{const el=document.querySelector(${JSON.stringify(v.selector)});if(!el)throw new Error('找不到');el.value=${JSON.stringify(v.value||'')};el.dispatchEvent(new Event('change',{bubbles:true}));})()`,returnByValue:true}); break;
+    case 'condition': {
+      const r=await cdp('Runtime.evaluate',{expression:`(()=>{
+        const t=${JSON.stringify(v.type||'element_exists')},s=${JSON.stringify(v.selector||'')},val=${JSON.stringify(v.value||'')};
+        if(t==='element_exists') return !!document.querySelector(s);
+        if(t==='text_contains')  return (document.querySelector(s)?.textContent||'').includes(val);
+        if(t==='url_contains')   return location.href.includes(s);
+        return false;
+      })()`,returnByValue:true});
+      addLog('SYS',`條件：${r?.result?.value?'成立✓':'不成立✗'}`); break;
+    }
     case 'cookie_get':
-      addLog('INFO', `→ 取得 Cookie: ${v.name}`);
+      addLog('SYS',`Cookie ${v.name} — CDP 模式請用 JS 擷取`);
+      if(v.var) variables[v.var]=''; break;
+    case 'storage_get': {
+      const r=await cdp('Runtime.evaluate',{expression:`localStorage.getItem(${JSON.stringify(v.key||'')})`,returnByValue:true});
+      if(v.var){variables[v.var]=r?.result?.value||'';addLog('SYS',`${v.var}="${variables[v.var]}"`);}
       break;
-    case 'cookie_set':
-      addLog('INFO', `→ 設定 Cookie: ${v.name}=${v.value}`);
-      break;
-    case 'condition':
-      addLog('INFO', `→ 條件判斷 [${v.type}]: ${v.selector}`);
-      break;
-    case 'loop':
-      addLog('INFO', `→ 迴圈 ${v.times} 次`);
-      break;
-    default:
-      addLog('INFO', `→ 執行 ${cmd.name}`);
-      await sleep(300);
-  }
-}
-
-async function mcpCall(method, params) {
-  if (!mcpConnected) {
-    // Simulation mode
-    addLog('SYS', `[模擬] ${method}`);
-    await sleep(150 + Math.random()*200);
-    return { simulated: true };
-  }
-
-  return new Promise((resolve, reject) => {
-    if (!ws || ws.readyState !== WebSocket.OPEN) {
-      reject(new Error('WebSocket 未連線'));
-      return;
     }
-    const id = Date.now();
-    const msg = JSON.stringify({ id, method, params });
-    ws.send(msg);
-
-    const handler = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        if (data.id === id) {
-          ws.removeEventListener('message', handler);
-          if (data.error) reject(new Error(data.error.message));
-          else resolve(data.result);
-        }
-      } catch(e) {}
-    };
-    ws.addEventListener('message', handler);
-    setTimeout(() => { ws.removeEventListener('message', handler); reject(new Error('逾時')); }, 30000);
-  });
-}
-
-async function stepScript() {
-  if (!steps.length) return;
-  if (currentStepIdx >= steps.length - 1) {
-    currentStepIdx = -1;
-    steps.forEach(s => s.status = '');
-  }
-  currentStepIdx++;
-  const step = steps[currentStepIdx];
-  const cmd = findCmd(step.cmdId);
-  addLog('INFO', `[單步 ${currentStepIdx+1}/${steps.length}] ${cmd.name}`);
-  try {
-    await simulateExecute(step, cmd, currentStepIdx);
-    step.status = 'done';
-    addLog('OK', `✓ ${cmd.name}`);
-  } catch(err) {
-    step.status = 'error';
-    addLog('ERR', `✗ ${err.message}`);
-  }
-  updateProgress(currentStepIdx + 1, steps.length);
-  renderSteps();
-}
-
-function stopScript() {
-  shouldStop = true;
-  addLog('WARN', '⏸ 停止請求已發送...');
-}
-
-function finishExecution() {
-  isRunning = false;
-  currentStepIdx = -1;
-  document.getElementById('runBtn').style.display = '';
-  document.getElementById('stopBtn').style.display = 'none';
-  document.getElementById('runningIndicator').classList.remove('active');
-  setStatus('connected', 'MCP 已連線');
-  if (!mcpConnected) setStatus('idle', '模擬模式');
-  addLog('OK', '▣ 執行完成');
-  renderSteps();
-}
-
-function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
-
-function updateProgress(cur, total) {
-  const pct = total ? Math.round((cur / total) * 100) : 0;
-  document.getElementById('progressFill').style.width = pct + '%';
-  document.getElementById('execInfo').textContent = `${cur}/${total} 步驟`;
-}
-
-// ═══════════════════════════════════════════
-//  MCP CONNECTION
-// ═══════════════════════════════════════════
-
-function connectMCP() {
-  const endpoint = document.getElementById('mcpEndpoint').value.trim();
-  if (!endpoint) { addLog('ERR', '請輸入 MCP 端點'); return; }
-
-  addLog('INFO', `嘗試連線 ${endpoint}...`);
-  setStatus('running', '連線中...');
-
-  try {
-    ws = new WebSocket(endpoint);
-
-    ws.onopen = () => {
-      mcpConnected = true;
-      setStatus('connected', 'MCP 已連線');
-      addLog('OK', `✓ 已連線：${endpoint}`);
-    };
-
-    ws.onerror = (e) => {
-      mcpConnected = false;
-      setStatus('error', '連線失敗');
-      addLog('ERR', `連線失敗 — 請確認 Chrome 已啟動除錯模式`);
-    };
-
-    ws.onclose = () => {
-      mcpConnected = false;
-      setStatus('idle', '已斷線');
-      addLog('WARN', 'WebSocket 連線已關閉');
-    };
-
-    ws.onmessage = (e) => {
-      // Handled per-request in mcpCall
-    };
-  } catch(err) {
-    addLog('ERR', `無法建立 WebSocket：${err.message}`);
-    setStatus('idle', '未連線');
+    case 'loop': addLog('SYS',`迴圈 ×${v.times}`); break;
+    default: addLog('WARN',`CDP 未實作 ${step.cmdId}`); await sleep(200);
   }
 }
 
-function disconnectMCP() {
-  if (ws) { ws.close(); ws = null; }
-  mcpConnected = false;
-  setStatus('idle', '未連線');
-  addLog('SYS', '已手動斷線');
+async function cdpPoll(expr,timeout=15000,interval=500){
+  const start=Date.now();
+  while(true){
+    const r=await cdp('Runtime.evaluate',{expression:expr,returnByValue:true});
+    if(r?.result?.value) return;
+    if(Date.now()-start>timeout) throw new Error('等待逾時');
+    await sleep(interval);
+  }
 }
 
-function testConnection() {
-  if (!mcpConnected) {
-    addLog('WARN', '未連線 MCP（將使用模擬模式）');
-    setStatus('idle', '模擬模式');
-    return;
+async function cdp(method,params){
+  if(!cdpConnected||!cdpWs||cdpWs.readyState!==WebSocket.OPEN){
+    addLog('SYS',`[CDP-sim] ${method}`); await sleep(150); return {simulated:true};
   }
-  addLog('INFO', '測試連線...');
-  mcpCall('Browser.getVersion', {}).then(r => {
-    addLog('OK', `✓ 連線正常`);
-  }).catch(e => {
-    addLog('ERR', `連線測試失敗：${e.message}`);
+  return new Promise((res,rej)=>{
+    const id=Date.now();
+    cdpWs.send(JSON.stringify({id,method,params}));
+    const h=(e)=>{ try{const d=JSON.parse(e.data); if(d.id===id){ cdpWs.removeEventListener('message',h); clearTimeout(t); if(d.error)rej(new Error(d.error.message)); else res(d.result); }}catch(err){} };
+    cdpWs.addEventListener('message',h);
+    const t=setTimeout(()=>{ cdpWs.removeEventListener('message',h); rej(new Error(`CDP 逾時：${method}`)); },cfgTimeout);
   });
 }
 
 // ═══════════════════════════════════════════
-//  STATUS
+// 9. EXTENSION ENGINE (postMessage bridge)
 // ═══════════════════════════════════════════
 
-function setStatus(state, text) {
-  const dot = document.getElementById('statusDot');
-  const txt = document.getElementById('statusText');
-  dot.className = 'status-dot ' + state;
-  txt.textContent = text;
-}
-
-// ═══════════════════════════════════════════
-//  LOG
-// ═══════════════════════════════════════════
-
-function addLog(level, msg) {
-  const container = document.getElementById('logEntries');
-  const now = new Date();
-  const time = now.toTimeString().slice(0,8);
-  const el = document.createElement('div');
-  el.className = 'log-entry';
-  el.innerHTML = `
-    <span class="log-time">${time}</span>
-    <span class="log-level ${level}">${level}</span>
-    <span class="log-msg">${msg}</span>
-  `;
-  container.prepend(el);
-  if (container.children.length > 300) container.lastChild.remove();
-}
-
-function clearLog() {
-  document.getElementById('logEntries').innerHTML = '';
-  addLog('SYS', '日誌已清除');
-}
-
-// ═══════════════════════════════════════════
-//  SCRIPT LIBRARY
-// ═══════════════════════════════════════════
-
-function saveToLibrary() {
-  const name = document.getElementById('scriptName').value || '未命名腳本';
-  const entry = {
-    id: Date.now(),
-    name,
-    steps: JSON.parse(JSON.stringify(steps)),
-    created: new Date().toISOString()
-  };
-  scriptLibrary.unshift(entry);
-  localStorage.setItem('mcp_rpa_library', JSON.stringify(scriptLibrary));
-  renderScriptLibrary();
-  addLog('OK', `✓ 腳本已儲存：${name}`);
-}
-
-function loadFromLibrary(id) {
-  const entry = scriptLibrary.find(s => s.id === id);
-  if (!entry) return;
-  steps = JSON.parse(JSON.stringify(entry.steps));
-  document.getElementById('scriptName').value = entry.name;
-  renderSteps();
-  switchMainTab('editor');
-  addLog('INFO', `載入腳本：${entry.name}（${steps.length} 步）`);
-}
-
-function deleteFromLibrary(id) {
-  scriptLibrary = scriptLibrary.filter(s => s.id !== id);
-  localStorage.setItem('mcp_rpa_library', JSON.stringify(scriptLibrary));
-  renderScriptLibrary();
-}
-
-function renderScriptLibrary() {
-  const list = document.getElementById('scriptLibraryList');
-  if (!scriptLibrary.length) {
-    list.innerHTML = `<div class="empty-state"><div class="empty-icon">📂</div>腳本庫為空<br>儲存腳本後會顯示在這裡</div>`;
-    return;
-  }
-  list.innerHTML = scriptLibrary.map(s => `
-    <div class="script-item" onclick="loadFromLibrary(${s.id})">
-      <span>📄</span>
-      <div class="script-item-name">${s.name}</div>
-      <span class="script-item-count">${s.steps.length}步</span>
-      <button class="btn btn-sm btn-icon" onclick="event.stopPropagation();exportSingle(${s.id})" title="匯出">↓</button>
-      <button class="btn btn-sm btn-icon" onclick="event.stopPropagation();deleteFromLibrary(${s.id})" title="刪除" style="color:var(--red)">✕</button>
-    </div>
-  `).join('');
-}
-
-// ═══════════════════════════════════════════
-//  IMPORT / EXPORT
-// ═══════════════════════════════════════════
-
-function exportScript() {
-  const name = document.getElementById('scriptName').value || 'script';
-  const data = {
-    version: '1.0',
-    name,
-    steps: steps.map(s => ({ cmdId: s.cmdId, values: s.values })),
-    exported: new Date().toISOString(),
-    tool: 'MCP-RPA-Controller'
-  };
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = name.replace(/\s+/g,'_') + '.json';
-  a.click();
-  URL.revokeObjectURL(url);
-  addLog('OK', `✓ 腳本已匯出：${name}.json`);
-}
-
-function exportSingle(id) {
-  const entry = scriptLibrary.find(s => s.id === id);
-  if (!entry) return;
-  const data = {
-    version: '1.0',
-    name: entry.name,
-    steps: entry.steps.map(s => ({ cmdId: s.cmdId, values: s.values })),
-    exported: new Date().toISOString()
-  };
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = entry.name.replace(/\s+/g,'_') + '.json';
-  a.click();
-  URL.revokeObjectURL(url);
-  addLog('OK', `✓ 匯出：${entry.name}.json`);
-}
-
-function importScript() {
-  document.getElementById('importFileInput').click();
-}
-
-function handleImport(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    try {
-      const data = JSON.parse(e.target.result);
-      if (!data.steps || !Array.isArray(data.steps)) throw new Error('格式錯誤');
-      steps = data.steps.map(s => ({
-        id: Date.now() + Math.random(),
-        cmdId: s.cmdId,
-        values: s.values || {}
-      }));
-      if (data.name) document.getElementById('scriptName').value = data.name;
-      renderSteps();
-      switchMainTab('editor');
-      addLog('OK', `✓ 匯入腳本：${data.name || file.name}（${steps.length} 步）`);
-    } catch(err) {
-      addLog('ERR', `匯入失敗：${err.message}`);
-    }
-    event.target.value = '';
-  };
-  reader.readAsText(file);
-}
-
-// ═══════════════════════════════════════════
-//  TABS & NAVIGATION
-// ═══════════════════════════════════════════
-
-function switchMainTab(name) {
-  document.querySelectorAll('.tab').forEach((t, i) => {
-    const names = ['editor','library','mcp'];
-    t.classList.toggle('active', names[i] === name);
-  });
-  document.querySelectorAll('.tab-content').forEach(c => {
-    c.classList.toggle('active', c.id === 'tab-' + name);
+async function extExec(step){
+  return new Promise((res,rej)=>{
+    const rid='rpa_'+Date.now()+'_'+Math.random().toString(36).slice(2);
+    const timer=setTimeout(()=>{ window.removeEventListener('message',h); rej(new Error(`Extension 逾時：${step.cmdId}`)); },cfgTimeout);
+    const h=(e)=>{
+      if(e.source!==window) return;
+      if(e.data?.type==='MCP_RPA_RESULT'&&e.data?.rid===rid){
+        window.removeEventListener('message',h); clearTimeout(timer);
+        if(e.data.error) rej(new Error(e.data.error));
+        else res(e.data.result);
+      }
+    };
+    window.addEventListener('message',h);
+    window.postMessage({type:'MCP_RPA_EXEC',from:'page',rid,step:{cmdId:step.cmdId,values:step.values||{}}},'*');
   });
 }
 
-function mobileSwitch(panel, btn) {
-  document.querySelectorAll('.mobile-nav-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  const panelCmds = document.querySelector('.panel-commands');
-  const panelCenter = document.querySelector('.app-shell > .panel:nth-child(2)');
-  const panelLog = document.querySelector('.panel-log');
-  if (panelCmds) panelCmds.style.display = panel === 'cmds' ? 'flex' : 'none';
-  if (panelCenter) panelCenter.style.display = panel === 'editor' ? 'flex' : 'none';
-  if (panelLog) panelLog.style.display = panel === 'log' ? 'flex' : 'none';
-}
-
-// ═══════════════════════════════════════════
-//  MODAL
-// ═══════════════════════════════════════════
-
-function openModal(id) {
-  document.getElementById(id).classList.add('open');
-  if (id === 'configModal') {
-    document.getElementById('modalStatus').textContent = mcpConnected ? '✓ 已連線' : '✗ 未連線（模擬模式）';
+// Listen for Extension pong + results
+window.addEventListener('message',(e)=>{
+  if(e.source!==window) return;
+  const d=e.data;
+  if(d?.type==='MCP_RPA_PONG'&&d?.from==='extension'){
+    window.__extDetected=true;
+    addLog('OK','✓ Extension 已就緒');
+    setStatus('connected','Extension 就緒');
+    document.getElementById('modeBadge').className='mode-badge ext';
+    document.getElementById('modeBadge').textContent='⬡ EXT';
   }
-}
-
-function closeModal(id) {
-  document.getElementById(id).classList.remove('open');
-}
-
-function applyConfig() {
-  const speed = document.getElementById('execSpeed').value;
-  document.getElementById('stepDelay').value = speed;
-  closeModal('configModal');
-  addLog('SYS', `設定已套用：延遲 ${speed}ms`);
-}
-
-document.querySelectorAll('.modal-overlay').forEach(o => {
-  o.addEventListener('click', e => { if (e.target === o) o.classList.remove('open'); });
 });
 
+function checkExt(){
+  addLog('INFO','偵測 Extension...');
+  window.__extDetected=false;
+  window.postMessage({type:'MCP_RPA_PING',from:'page'},'*');
+  setTimeout(()=>{
+    if(window.__extDetected){
+      addLog('OK','✓ Extension 已安裝並就緒');
+    } else {
+      addLog('WARN','Extension 未偵測 — 請確認已安裝並啟用（見「Extension 安裝」頁）');
+      setStatus('idle','Extension 未偵測');
+    }
+  },700);
+}
+
 // ═══════════════════════════════════════════
-//  BOOT
+// 10. EXTENSION DOWNLOADER (inline ZIP)
 // ═══════════════════════════════════════════
+
+function downloadExtension(){
+  // Build the extension files as text and package into a ZIP using JSZip-lite approach
+  // We'll create a self-contained ZIP via a data URL with the extension files embedded
+  addLog('INFO','建立 Extension 封裝...');
+
+  const files = getExtensionFiles();
+  const zip = createZip(files);
+  const blob = new Blob([zip],{type:'application/zip'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href=url; a.download='mcp-rpa-extension.zip'; a.click();
+  URL.revokeObjectURL(url);
+  addLog('OK','✓ mcp-rpa-extension.zip 已下載');
+}
+
+function getExtensionFiles(){
+  const manifest = JSON.stringify({
+    manifest_version:3,name:"MCP · RPA Controller",version:"1.0.0",
+    description:"從 MCP RPA 工具匯入 JSON 腳本，在 Chrome 真實執行自動化流程",
+    permissions:["activeTab","scripting","tabs","storage","alarms","cookies"],
+    host_permissions:["<all_urls>"],
+    action:{default_popup:"popup.html",default_title:"MCP RPA"},
+    background:{service_worker:"background.js",type:"module"},
+    content_scripts:[{matches:["<all_urls>"],js:["content.js"],run_at:"document_idle"}]
+  },null,2);
+
+  const content = `// MCP RPA — Content Script Bridge
+window.addEventListener('message',async(e)=>{
+  if(e.source!==window)return;
+  const d=e.data;if(!d||!d.type)return;
+  if(d.type==='MCP_RPA_PING'&&d.from==='page'){window.postMessage({type:'MCP_RPA_PONG',from:'extension'},'*');return;}
+  if(d.type==='MCP_RPA_EXEC'&&d.from==='page'){
+    const{rid,step}=d;
+    try{
+      const r=await chrome.runtime.sendMessage({type:'EXEC_STEP',step});
+      if(r?.error)window.postMessage({type:'MCP_RPA_RESULT',rid,error:r.error},'*');
+      else window.postMessage({type:'MCP_RPA_RESULT',rid,result:r?.data},'*');
+    }catch(err){window.postMessage({type:'MCP_RPA_RESULT',rid,error:err.message},'*');}
+  }
+});
+`;
+
+  const background = `// MCP RPA — Background Service Worker
+let ST={running:false,paused:false,currentStep:-1,steps:[],variables:{},targetTabId:null,stopRequested:false,config:{stepDelay:800,errorHandling:'stop',timeout:15000}};
+chrome.runtime.onMessage.addListener((msg,sender,sendResponse)=>{
+  (async()=>{
+    try{
+      if(msg.type==='EXEC_STEP'){
+        try{await executeStep(msg.step);sendResponse({ok:true,data:null});}
+        catch(e){sendResponse({error:e.message});}
+      } else if(msg.type==='RUN_SCRIPT'){
+        await runScript(msg.script,msg.config);sendResponse({ok:true});
+      } else if(msg.type==='STOP_SCRIPT'){
+        ST.stopRequested=true;ST.running=false;sendResponse({ok:true});
+      } else { sendResponse({error:'unknown'}); }
+    }catch(e){sendResponse({error:e.message});}
+  })();
+  return true;
+});
+async function ensureTab(){
+  if(ST.targetTabId){try{return await chrome.tabs.get(ST.targetTabId);}catch(e){}}
+  const[t]=await chrome.tabs.query({active:true,currentWindow:true});
+  if(!t)throw new Error('找不到分頁');
+  ST.targetTabId=t.id;return t;
+}
+async function waitLoad(id,timeout=15000){
+  const s=Date.now();await sleep(300);
+  return new Promise((res,rej)=>{
+    const c=setInterval(async()=>{
+      try{const t=await chrome.tabs.get(id);if(t.status==='complete'){clearInterval(c);res(t);}
+      if(Date.now()-s>timeout){clearInterval(c);rej(new Error('載入逾時'));}}
+      catch(e){clearInterval(c);rej(e);}
+    },300);
+  });
+}
+async function pollUntil(fn,timeout=15000,interval=500){
+  const s=Date.now();
+  while(true){if(await fn())return;if(Date.now()-s>timeout)throw new Error('等待逾時');await sleep(interval);}
+}
+async function runScript(script,config={}){
+  if(ST.running)return;
+  ST={...ST,running:true,paused:false,stopRequested:false,currentStep:-1,steps:script.steps,variables:{},targetTabId:null,config:{stepDelay:config.stepDelay??800,errorHandling:config.errorHandling??'stop',timeout:config.timeout??15000}};
+  const[tab]=await chrome.tabs.query({active:true,currentWindow:true});
+  ST.targetTabId=tab?.id||null;
+  for(let i=0;i<ST.steps.length;i++){
+    if(ST.stopRequested)break;
+    while(ST.paused){await sleep(200);if(ST.stopRequested)break;}
+    ST.currentStep=i;
+    try{await executeStep(ST.steps[i]);}
+    catch(err){if(ST.config.errorHandling==='stop')break;}
+    if(i<ST.steps.length-1&&!ST.stopRequested)await sleep(ST.config.stepDelay);
+  }
+  ST.running=false;ST.currentStep=-1;
+}
+function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+async function executeStep(step){
+  const v=step.values||{};
+  switch(step.cmdId){
+    case 'navigate':{if(!v.url)throw new Error('URL空');const t=await ensureTab();await chrome.tabs.update(t.id,{url:v.url});ST.targetTabId=t.id;await waitLoad(t.id);break;}
+    case 'reload':{const t=await ensureTab();await chrome.tabs.reload(t.id);await waitLoad(t.id);break;}
+    case 'back':{const t=await ensureTab();await chrome.scripting.executeScript({target:{tabId:t.id},func:()=>history.back()});await sleep(1500);break;}
+    case 'forward':{const t=await ensureTab();await chrome.scripting.executeScript({target:{tabId:t.id},func:()=>history.forward()});await sleep(1500);break;}
+    case 'tab_new':{const nt=await chrome.tabs.create({url:v.url||'about:blank'});ST.targetTabId=nt.id;await waitLoad(nt.id);break;}
+    case 'tab_close':{const t=await ensureTab();await chrome.tabs.remove(t.id);ST.targetTabId=null;break;}
+    case 'click':case 'dblclick':case 'hover':{
+      if(!v.selector)throw new Error('選擇器空');
+      const t=await ensureTab();
+      const r=await chrome.scripting.executeScript({target:{tabId:t.id},func:(sel,type)=>{
+        const el=document.querySelector(sel);if(!el)return{error:'找不到:'+sel};
+        el.scrollIntoView({behavior:'smooth',block:'center'});
+        if(type==='dblclick')el.dispatchEvent(new MouseEvent('dblclick',{bubbles:true}));
+        else if(type==='hover')el.dispatchEvent(new MouseEvent('mouseover',{bubbles:true}));
+        else el.click();
+        return{ok:true};
+      },args:[v.selector,step.cmdId]});
+      if(r[0]?.result?.error)throw new Error(r[0].result.error);break;}
+    case 'type':{
+      if(!v.selector)throw new Error('選擇器空');const t=await ensureTab();
+      const r=await chrome.scripting.executeScript({target:{tabId:t.id},func:(sel,val,clear)=>{
+        const el=document.querySelector(sel);if(!el)return{error:'找不到:'+sel};
+        el.focus();if(clear==='true'){el.value='';el.textContent='';}
+        if(el.contentEditable==='true'){el.textContent=val;el.dispatchEvent(new InputEvent('input',{bubbles:true,data:val}));}
+        else{el.value=val;el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));}
+        return{ok:true};
+      },args:[v.selector,v.value||'',v.clear]});
+      if(r[0]?.result?.error)throw new Error(r[0].result.error);break;}
+    case 'key_press':{const t=await ensureTab();await chrome.scripting.executeScript({target:{tabId:t.id},func:(key)=>{
+      const el=document.activeElement||document.body;const o={key,bubbles:true,cancelable:true};
+      el.dispatchEvent(new KeyboardEvent('keydown',o));el.dispatchEvent(new KeyboardEvent('keypress',o));el.dispatchEvent(new KeyboardEvent('keyup',o));
+      if(key==='Enter'){const f=el.closest('form');if(f)f.dispatchEvent(new Event('submit',{bubbles:true}));}
+    },args:[v.key||'Enter']});break;}
+    case 'scroll':{const t=await ensureTab();await chrome.scripting.executeScript({target:{tabId:t.id},func:(dir,amount)=>{
+      const px=parseInt(amount)||500;
+      ({down:()=>window.scrollBy(0,px),up:()=>window.scrollBy(0,-px),top:()=>window.scrollTo(0,0),bottom:()=>window.scrollTo(0,document.body.scrollHeight)}[dir]||(() =>window.scrollBy(0,px)))();
+    },args:[v.direction||'down',v.amount]});break;}
+    case 'scroll_to':{if(!v.selector)throw new Error('選擇器空');const t=await ensureTab();
+      await chrome.scripting.executeScript({target:{tabId:t.id},func:(sel)=>{const el=document.querySelector(sel);if(!el)throw new Error('找不到');el.scrollIntoView({behavior:'smooth',block:'center'});},args:[v.selector]});break;}
+    case 'wait':await sleep(parseInt(v.ms)||1000);break;
+    case 'wait_selector':{if(!v.selector)throw new Error('選擇器空');const t=await ensureTab();const st=v.state||'visible';const to=parseInt(v.timeout)||ST.config.timeout;
+      await pollUntil(async()=>{const r=await chrome.scripting.executeScript({target:{tabId:t.id},func:(sel,s)=>{const el=document.querySelector(sel);if(s==='exists')return!!el;if(s==='hidden')return!el||el.offsetParent===null;return!!el&&el.offsetParent!==null;},args:[v.selector,st]});return r[0]?.result===true;},to);break;}
+    case 'wait_url':{const t=await ensureTab();const to=ST.config.timeout;await pollUntil(async()=>{const tab=await chrome.tabs.get(t.id);return tab.url?.includes(v.contains);},to);break;}
+    case 'extract_text':{if(!v.selector)throw new Error('選擇器空');const t=await ensureTab();
+      const r=await chrome.scripting.executeScript({target:{tabId:t.id},func:(sel)=>{const el=document.querySelector(sel);return el?(el.textContent||el.innerText||'').trim():null;},args:[v.selector]});
+      if(r[0]?.result===null)throw new Error('找不到:'+v.selector);
+      if(v.var)ST.variables[v.var]=r[0].result;break;}
+    case 'extract_attr':{if(!v.selector)throw new Error('選擇器空');const t=await ensureTab();
+      const r=await chrome.scripting.executeScript({target:{tabId:t.id},func:(sel,attr)=>{const el=document.querySelector(sel);return el?el.getAttribute(attr):null;},args:[v.selector,v.attr||'href']});
+      if(v.var)ST.variables[v.var]=r[0]?.result;break;}
+    case 'get_url':{const t=await ensureTab();const tab=await chrome.tabs.get(t.id);if(v.var)ST.variables[v.var]=tab.url;break;}
+    case 'screenshot':{const t=await ensureTab();const tab=await chrome.tabs.get(t.id);const dataUrl=await chrome.tabs.captureVisibleTab(tab.windowId,{format:'png'});
+      const name=(v.name||'screenshot').replace('{timestamp}',Date.now());
+      await chrome.scripting.executeScript({target:{tabId:t.id},func:(url,fn)=>{const a=document.createElement('a');a.href=url;a.download=fn+'.png';a.click();},args:[dataUrl,name]});break;}
+    case 'js_eval':{if(!v.code)throw new Error('JS空');const t=await ensureTab();
+      const r=await chrome.scripting.executeScript({target:{tabId:t.id},func:(code)=>{try{return{result:Function(code)()};}catch(e){return{error:e.message};}},args:[v.code]});
+      if(r[0]?.result?.error)throw new Error(r[0].result.error);
+      if(v.var&&r[0]?.result?.result!==undefined)ST.variables[v.var]=r[0].result.result;break;}
+    case 'js_inject':{if(!v.url)throw new Error('URL空');const t=await ensureTab();
+      await chrome.scripting.executeScript({target:{tabId:t.id},func:(url)=>new Promise((res,rej)=>{const s=document.createElement('script');s.src=url;s.onload=res;s.onerror=()=>rej(new Error('載入失敗'));document.head.appendChild(s);}),args:[v.url]});break;}
+    case 'cookie_get':{const t=await ensureTab();const tab=await chrome.tabs.get(t.id);const c=await chrome.cookies.get({url:tab.url,name:v.name});if(v.var)ST.variables[v.var]=c?.value||'';break;}
+    case 'cookie_set':{const t=await ensureTab();const tab=await chrome.tabs.get(t.id);await chrome.cookies.set({url:tab.url,name:v.name,value:v.value});break;}
+    case 'storage_get':{const t=await ensureTab();const r=await chrome.scripting.executeScript({target:{tabId:t.id},func:(k)=>localStorage.getItem(k),args:[v.key]});if(v.var)ST.variables[v.var]=r[0]?.result||'';break;}
+    case 'condition':{const t=await ensureTab();const r=await chrome.scripting.executeScript({target:{tabId:t.id},func:(type,sel,val)=>{if(type==='element_exists')return!!document.querySelector(sel);if(type==='text_contains')return(document.querySelector(sel)?.textContent||'').includes(val);if(type==='url_contains')return location.href.includes(sel);return false;},args:[v.type||'element_exists',v.selector,v.value]});break;}
+    case 'select':{const t=await ensureTab();await chrome.scripting.executeScript({target:{tabId:t.id},func:(sel,val)=>{const el=document.querySelector(sel);if(!el)throw new Error('找不到');el.value=val;el.dispatchEvent(new Event('change',{bubbles:true}));},args:[v.selector,v.value]});break;}
+    default:break;
+  }
+}
+`;
+
+  const popup = `<!DOCTYPE html><html lang="zh-TW"><head><meta charset="UTF-8"><title>MCP RPA</title>
+<style>body{width:340px;min-height:200px;background:#0a0b0e;color:#e0e6f0;font-family:'IBM Plex Mono',monospace;font-size:12px;padding:0;margin:0}
+header{display:flex;align-items:center;gap:10px;padding:10px 14px;background:#111318;border-bottom:1px solid #252932}
+.logo{width:20px;height:20px;background:#00d4ff;clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%)}
+.brand{font-size:13px;font-weight:600;color:#00d4ff}
+.body{padding:14px}
+.msg{font-size:11px;color:#8892a0;line-height:1.7;margin-bottom:12px}
+.btn{display:inline-block;padding:7px 14px;background:#00d4ff;color:#000;border:none;border-radius:3px;font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;cursor:pointer;margin-right:6px}
+.btn:hover{background:#00b8d9}
+code{color:#00d4ff;font-size:10px}
+</style></head><body>
+<header><div class="logo"></div><span class="brand">MCP · RPA</span></header>
+<div class="body">
+<div class="msg">Extension 已安裝並執行中。<br>請在 <code>mcp-rpa-tool.html</code> 中選擇 <strong>EXT 模式</strong> 使用。</div>
+<button class="btn" onclick="chrome.tabs.create({url:'chrome://extensions/'})">管理 Extensions</button>
+</div></body></html>`;
+
+  // Simple 16×16 cyan hexagon icon as base64 PNG
+  const icon16b64 = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAbklEQVQ4T2NkYGD4z8DAAMQMDAwMQEwIAiIGBgYGRiIGBgZGIgYGBkYiBgYGRiIGBgZGIgYGBkYiBgYGRiIGBgZGIgYGBkYiBgYGRiIGBgZGIgYGBkYiBgYGRiIGBgZGIgYGBkYiBgYGRiIGBgZGACFZCxHZmqZPAAAAAElFTkSuQmCC';
+
+  return [
+    { name:'manifest.json', data: strToBytes(manifest) },
+    { name:'background.js', data: strToBytes(background) },
+    { name:'content.js',    data: strToBytes(content) },
+    { name:'popup.html',    data: strToBytes(popup) },
+    { name:'icon16.png',    data: b64ToBytes(icon16b64) },
+    { name:'icon48.png',    data: b64ToBytes(icon16b64) },
+    { name:'icon128.png',   data: b64ToBytes(icon16b64) },
+  ];
+}
+
+// ── Minimal ZIP builder (no external lib needed) ──
+function createZip(files){
+  const encoder = new TextEncoder();
+  let localHeaders=[]; let centralDir=[]; let offset=0;
+
+  function u16(n){ const b=new Uint8Array(2); new DataView(b.buffer).setUint16(0,n,true); return b; }
+  function u32(n){ const b=new Uint8Array(4); new DataView(b.buffer).setUint32(0,n,true); return b; }
+  function concat(...arrs){ const len=arrs.reduce((a,b)=>a+b.length,0); const out=new Uint8Array(len); let i=0; for(const a of arrs){out.set(a,i);i+=a.length;} return out; }
+  function crc32(data){ let c=0xFFFFFFFF; for(let i=0;i<data.length;i++){c^=data[i];for(let j=0;j<8;j++)c=c&1?(c>>>1)^0xEDB88320:(c>>>1);} return (c^0xFFFFFFFF)>>>0; }
+
+  for(const f of files){
+    const name = encoder.encode(f.name);
+    const data = f.data;
+    const crc  = crc32(data);
+    const lh = concat(
+      new Uint8Array([0x50,0x4B,0x03,0x04]), // local file header sig
+      u16(20),u16(0),u16(0),u16(0),u16(0),  // version, flags, compression, time, date
+      u32(crc),u32(data.length),u32(data.length),
+      u16(name.length),u16(0),
+      name, data
+    );
+    localHeaders.push(lh);
+    const cd = concat(
+      new Uint8Array([0x50,0x4B,0x01,0x02]),
+      u16(20),u16(20),u16(0),u16(0),u16(0),u16(0),
+      u32(crc),u32(data.length),u32(data.length),
+      u16(name.length),u16(0),u16(0),u16(0),u16(0),u32(0),u32(offset),
+      name
+    );
+    centralDir.push(cd);
+    offset += lh.length;
+  }
+
+  const cdData  = concat(...centralDir);
+  const eocd    = concat(
+    new Uint8Array([0x50,0x4B,0x05,0x06]),
+    u16(0),u16(0),
+    u16(files.length),u16(files.length),
+    u32(cdData.length),u32(offset),
+    u16(0)
+  );
+  return concat(...localHeaders, cdData, eocd);
+}
+
+function strToBytes(str){ return new TextEncoder().encode(str); }
+function b64ToBytes(b64){ const bin=atob(b64); const b=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++)b[i]=bin.charCodeAt(i); return b; }
+
+// ═══════════════════════════════════════════
+// 11. SCRIPT LIBRARY
+// ═══════════════════════════════════════════
+
+function renderBuiltins(){
+  document.getElementById('builtinList').innerHTML = BUILTIN_SCRIPTS.map(s=>
+    `<div class="lib-item" onclick="loadScript(${JSON.stringify(JSON.stringify(s))})">
+      <span>${s.icon}</span>
+      <span class="lib-name">${s.name}</span>
+      <span class="lib-count">${s.steps.length}步</span>
+      <button class="btn sm ico" onclick="event.stopPropagation();exportBuiltin('${s.id}')" data-tip="匯出">↓</button>
+    </div>`
+  ).join('');
+}
+
+function renderUserLib(){
+  const el=document.getElementById('userLibList');
+  if(!userLib.length){
+    el.innerHTML='<div class="empty-state"><div class="empty-icon">📂</div>尚無儲存腳本</div>'; return;
+  }
+  el.innerHTML=userLib.map((s,i)=>
+    `<div class="lib-item">
+      <span>📄</span>
+      <span class="lib-name" onclick="loadScript(${JSON.stringify(JSON.stringify(s))})" style="cursor:pointer">${s.name}</span>
+      <span class="lib-count">${s.steps.length}步</span>
+      <button class="btn sm ico" onclick="exportSingle(${i})" data-tip="匯出">↓</button>
+      <button class="btn sm ico" onclick="deleteLib(${i})" data-tip="刪除" style="color:var(--rd)">✕</button>
+    </div>`
+  ).join('');
+}
+
+function loadScript(jsonStr){
+  const s = typeof jsonStr==='string' ? JSON.parse(jsonStr) : jsonStr;
+  steps = (s.steps||[]).map(st=>({id:Date.now()+Math.random(),cmdId:st.cmdId,values:{...st.values},status:''}));
+  document.getElementById('scriptName').value = s.name||'未命名腳本';
+  variables={};
+  document.getElementById('varsWrap').style.display='none';
+  renderSteps();
+  switchTab('editor');
+  addLog('INFO',`載入：${s.name}（${steps.length} 步）`);
+}
+
+function saveToLib(){
+  const entry={name:document.getElementById('scriptName').value||'未命名',
+    steps:steps.map(s=>({cmdId:s.cmdId,values:{...s.values}})),
+    saved:new Date().toISOString()};
+  userLib.unshift(entry);
+  localStorage.setItem('mcp_rpa_lib',JSON.stringify(userLib));
+  renderUserLib();
+  addLog('OK',`✓ 已存庫：${entry.name}`);
+}
+
+function deleteLib(i){
+  userLib.splice(i,1);
+  localStorage.setItem('mcp_rpa_lib',JSON.stringify(userLib));
+  renderUserLib();
+}
+
+function exportBuiltin(id){
+  const s=BUILTIN_SCRIPTS.find(x=>x.id===id); if(!s) return;
+  doExportJSON({version:'1.0',name:s.name,steps:s.steps,exported:new Date().toISOString()},s.id);
+}
+
+function exportSingle(i){
+  const s=userLib[i]; if(!s) return;
+  doExportJSON({version:'1.0',name:s.name,steps:s.steps,exported:new Date().toISOString()},s.name);
+}
+
+// ═══════════════════════════════════════════
+// 12. IMPORT / EXPORT
+// ═══════════════════════════════════════════
+
+function importScript(){ document.getElementById('importFile').click(); }
+
+function handleImport(e){
+  const file=e.target.files[0]; if(!file) return;
+  const r=new FileReader();
+  r.onload=ev=>{
+    try{
+      const d=JSON.parse(ev.target.result);
+      if(!d.steps||!Array.isArray(d.steps)) throw new Error('格式錯誤');
+      loadScript(d);
+      addLog('OK',`✓ 匯入：${d.name||file.name}（${d.steps.length}步）`);
+    }catch(err){ addLog('ERR',`匯入失敗：${err.message}`); }
+    e.target.value='';
+  };
+  r.readAsText(file);
+}
+
+function exportScript(){
+  const name=document.getElementById('scriptName').value||'script';
+  doExportJSON({version:'1.0',name,steps:steps.map(s=>({cmdId:s.cmdId,values:s.values})),exported:new Date().toISOString()},name);
+}
+
+function doExportJSON(data,filename){
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download=(filename||'script').replace(/[\s\/\\]/g,'_')+'.json'; a.click();
+  URL.revokeObjectURL(url);
+  addLog('OK',`✓ 匯出：${a.download}`);
+}
+
+// ═══════════════════════════════════════════
+// 13. LOG
+// ═══════════════════════════════════════════
+
+function addLog(level,msg){
+  const now=new Date().toTimeString().slice(0,8);
+  logs.unshift({t:now,level,msg});
+  if(logs.length>500) logs.pop();
+  const el=document.getElementById('logList');
+  const row=document.createElement('div');
+  row.className='log-row';
+  row.innerHTML=`<span class="lt">${now}</span><span class="ll ${level}">${level}</span><span class="lm">${msg}</span>`;
+  el.prepend(row);
+  if(el.children.length>200) el.lastChild.remove();
+}
+
+function clearLog(){ document.getElementById('logList').innerHTML=''; logs=[]; addLog('SYS','日誌已清除'); }
+
+function exportLog(){
+  const txt=logs.map(l=>`[${l.t}] ${l.level} ${l.msg}`).join('\n');
+  const blob=new Blob([txt],{type:'text/plain'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download=`mcp-rpa-log-${Date.now()}.txt`; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ═══════════════════════════════════════════
+// 14. MCP / CDP CONNECTION
+// ═══════════════════════════════════════════
+
+function connectCDP(){
+  const ep=document.getElementById('cfEndpoint').value.trim();
+  if(!ep){ addLog('ERR','請輸入端點'); return; }
+  addLog('INFO',`連線 ${ep}...`); setStatus('running','連線中...');
+  try{
+    cdpWs=new WebSocket(ep);
+    cdpWs.onopen=()=>{ cdpConnected=true; setStatus('connected','CDP 已連線'); addLog('OK',`✓ ${ep}`); };
+    cdpWs.onerror=()=>{ cdpConnected=false; setStatus('error','連線失敗'); addLog('ERR','CDP 連線失敗'); };
+    cdpWs.onclose=()=>{ cdpConnected=false; setStatus('idle','CDP 已斷線'); addLog('WARN','WebSocket 關閉'); };
+  }catch(e){ addLog('ERR',`錯誤：${e.message}`); setStatus('idle',''); }
+}
+
+function disconnectCDP(){ if(cdpWs) cdpWs.close(); cdpConnected=false; setStatus('idle','未連線'); addLog('SYS','CDP 已斷線'); }
+
+function testCDP(){
+  if(!cdpConnected){ addLog('WARN','未連線（使用模擬）'); return; }
+  cdp('Browser.getVersion',{}).then(()=>addLog('OK','✓ CDP 正常')).catch(e=>addLog('ERR',`${e.message}`));
+}
+
+// ═══════════════════════════════════════════
+// 15. DIAGNOSTICS
+// ═══════════════════════════════════════════
+
+async function runDiag(){
+  const port=document.getElementById('cfPort').value||'9222';
+  const box=document.getElementById('diagBox');
+  box.innerHTML='<span style="color:var(--tx3)">偵測中...</span>';
+  const R=(icon,key,val,ok)=>`<div class="diag-row"><span class="diag-icon" style="color:${ok===true?'var(--gn)':ok===false?'var(--rd)':'var(--yw)'}">${icon}</span><span class="diag-key">${key}</span><span class="diag-val" style="color:${ok===true?'var(--tx)':ok===false?'var(--rd)':'var(--tx2)'}">${val}</span></div>`;
+  const rows=[];
+
+  let ok=false, ver='';
+  try{
+    const r=await fetch(`http://localhost:${port}/json/version`,{cache:'no-store'});
+    if(r.ok){ const j=await r.json(); ok=true; ver=j.Browser||'Chrome'; }
+  }catch(e){}
+
+  rows.push(R(ok?'✓':'✗',`Chrome port :${port}`,ok?`就緒 · ${ver}`:'無法連線 — 請以除錯模式啟動',ok));
+
+  if(ok){
+    try{
+      const r2=await fetch(`http://localhost:${port}/json`,{cache:'no-store'});
+      if(r2.ok){ const tabs=await r2.json(); const pg=tabs.filter(t=>t.type==='page'); rows.push(R('✓','可控制分頁',`${pg.length} 個`,true)); if(pg[0]) rows.push(R('→','目前分頁',pg[0].title||pg[0].url,null)); }
+    }catch(e){}
+    rows.push(R('★','下一步','點擊「連線 CDP」→ 選 CDP 模式 → 執行',true));
+  } else {
+    rows.push(R('!','下一步','請先以除錯模式啟動 Chrome（見下方指令）',false));
+  }
+
+  rows.push(R(window.__extDetected?'✓':'!','Extension 狀態',window.__extDetected?'已就緒':'未偵測（見「Extension 安裝」頁）',window.__extDetected||null));
+
+  box.innerHTML=rows.join('');
+  addLog(ok?'OK':'WARN',`診斷完成：CDP ${ok?'就緒':'未連線'}，Extension ${window.__extDetected?'就緒':'未偵測'}`);
+}
+
+// ═══════════════════════════════════════════
+// 16. UI HELPERS
+// ═══════════════════════════════════════════
+
+function setMode(mode){
+  execMode=mode;
+  ['simulate','extension','cdp'].forEach(m=>{
+    document.getElementById('mb'+{simulate:'Sim',extension:'Ext',cdp:'Cdp'}[m]).classList.toggle('on',m===mode);
+  });
+  const labels={simulate:'⬡ 模擬',extension:'⬡ EXT',cdp:'⬡ CDP'};
+  const badge=document.getElementById('modeBadge');
+  badge.textContent=labels[mode];
+  badge.className='mode-badge '+(mode==='extension'?'ext':mode==='cdp'?'cdp':'sim');
+  document.getElementById('extBanner').style.display=mode==='extension'?'flex':'none';
+  document.getElementById('modeCheck-simulate').textContent=mode==='simulate'?'✓':'';
+  document.getElementById('modeCheck-extension').textContent=mode==='extension'?'✓':'';
+  document.getElementById('modeCheck-cdp').textContent=mode==='cdp'?'✓':'';
+  addLog('SYS',`切換：${labels[mode]}`);
+  if(mode==='extension') checkExt();
+  if(mode==='cdp'&&!cdpConnected) addLog('WARN','請至 MCP 設定 → 連線 CDP');
+}
+
+function switchTab(name){
+  const names=['editor','library','config','install'];
+  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('on',names[i]===name));
+  document.querySelectorAll('.tabpanel').forEach(p=>p.classList.toggle('on',p.id===`tp-${name}`));
+}
+
+function setStatus(state,text){
+  document.getElementById('sdot').className='sdot '+(state||'idle');
+  document.getElementById('stext').textContent=text||'待機';
+}
+
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+function stepLabel(step){
+  const v=step.values||{};
+  const m={navigate:`→ ${v.url}`,click:`click ${v.selector}`,dblclick:`dblclick ${v.selector}`,hover:`hover ${v.selector}`,
+    type:`type "${(v.value||'').slice(0,20)}"`,select:`select ${v.value}`,key_press:`key ${v.key}`,
+    scroll:`scroll ${v.direction}`,scroll_to:`scroll→ ${v.selector}`,
+    wait:`wait ${v.ms}ms`,wait_selector:`wait[${v.state}] ${v.selector}`,wait_url:`wait url:${v.contains}`,
+    extract_text:`extract ${v.selector}→${v.var}`,extract_attr:`attr ${v.selector}.${v.attr}→${v.var}`,
+    get_url:`getUrl→${v.var}`,screenshot:`📸 ${v.name}`,js_eval:`JS: ${(v.code||'').slice(0,25)}`,
+    js_inject:`inject ${(v.url||'').slice(0,25)}`,cookie_get:`cookie ${v.name}→${v.var}`,
+    cookie_set:`cookie ${v.name}=${v.value}`,storage_get:`storage ${v.key}→${v.var}`,
+    condition:`if[${v.type}] ${v.selector}`,loop:`loop×${v.times}`,
+    reload:`reload`,back:`←`,forward:`→`,tab_new:`new ${v.url}`,tab_close:`close tab`,
+  };
+  return m[step.cmdId]||step.cmdId;
+}
+
+// Modals
+function openModal(id){ document.getElementById(id).classList.add('open'); }
+function closeModal(id){ document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.overlay').forEach(o=>o.addEventListener('click',e=>{ if(e.target===o) o.classList.remove('open'); }));
+
+function applySettings(){
+  cfgDelay=parseInt(document.getElementById('setSpeed').value)||800;
+  cfgError=document.getElementById('setError').value;
+  document.getElementById('cfDelay').value=cfgDelay;
+  document.getElementById('cfError').value=cfgError;
+  document.getElementById('modalStatus').textContent=`✓ 已套用：延遲 ${cfgDelay}ms，錯誤處理：${cfgError}`;
+  addLog('OK',`設定套用：延遲${cfgDelay}ms`);
+  setTimeout(()=>closeModal('settingModal'),800);
+}
+
+// Mobile nav
+function mobSwitch(panel,btn){
+  document.querySelectorAll('.mob-btn').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  const cmdP=document.querySelector('.cmd-panel');
+  const midP=document.querySelector('.shell>.panel:nth-child(2)');
+  const logP=document.querySelector('.log-panel');
+  if(cmdP)  cmdP.style.display=panel==='cmd'?'flex':'none';
+  if(midP)  midP.style.display=panel==='editor'?'flex':'none';
+  if(logP)  logP.style.display=panel==='log'?'flex':'none';
+}
+
+// ── BOOT ──
 init();
 </script>
 </body>
