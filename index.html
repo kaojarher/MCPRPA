@@ -329,6 +329,7 @@ header{position:relative;z-index:10;display:flex;align-items:center;gap:12px;
       <div class="tab"     onclick="switchTab('library')">腳本庫</div>
       <div class="tab"     onclick="switchTab('config')">MCP 設定</div>
       <div class="tab"     onclick="switchTab('install')">Extension 安裝</div>
+      <div class="tab"     onclick="switchTab('generator')">⬇ 執行器產生</div>
     </div>
 
     <!-- EDITOR -->
@@ -519,6 +520,65 @@ header{position:relative;z-index:10;display:flex;align-items:center;gap:12px;
     </div>
     <div class="p-body"><div class="log-list" id="logList"></div></div>
   </div>
+
+
+    <!-- GENERATOR PANEL -->
+    <div class="tabpanel" id="tp-generator">
+      <div class="p-body" id="genBody">
+        <div class="g-label" style="padding-top:0">⬇ 路徑 C — 獨立 HTML 執行器產生器</div>
+        <div style="margin-bottom:12px;padding:10px 12px;background:rgba(0,212,255,.05);border:1px solid rgba(0,212,255,.2);border-radius:4px;font-size:11px;color:var(--ac);line-height:1.7">
+          將目前腳本（或腳本庫中的任一腳本）打包成<strong>獨立 HTML 執行器</strong>。<br>
+          雙擊開啟、選 EXT 模式即可真實執行，無需開發環境。
+        </div>
+
+        <!-- Script selector -->
+        <div class="cf" style="margin-bottom:10px">
+          <label class="cf-label">選擇要打包的腳本</label>
+          <select class="cf-input" id="genScriptSel" onchange="genPreview()">
+            <option value="__current__">▶ 目前編輯器中的腳本</option>
+          </select>
+        </div>
+
+        <!-- Config row -->
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px">
+          <div class="cf" style="margin:0">
+            <label class="cf-label">執行器標題</label>
+            <input class="cf-input" id="genTitle" value="MCP RPA 執行器" oninput="genPreview()">
+          </div>
+          <div class="cf" style="margin:0">
+            <label class="cf-label">步驟延遲 (ms)</label>
+            <input class="cf-input" id="genDelay" type="number" value="800" min="100" oninput="genPreview()">
+          </div>
+          <div class="cf" style="margin:0">
+            <label class="cf-label">錯誤處理</label>
+            <select class="cf-input" id="genError" onchange="genPreview()">
+              <option value="stop">遇錯停止</option>
+              <option value="skip">遇錯跳過</option>
+              <option value="retry">重試一次</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Batch toggle -->
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+          <input type="checkbox" id="genBatch" onchange="toggleBatchMode()" style="accent-color:var(--ac)">
+          <label for="genBatch" style="font-size:11px;color:var(--tx2);cursor:pointer">批次模式：將內建腳本庫全部打包進一個執行器</label>
+        </div>
+        <div id="batchPickWrap" style="display:none;margin-bottom:10px;max-height:180px;overflow-y:auto;border:1px solid var(--bd);border-radius:4px;padding:8px">
+          <div id="batchPickList"></div>
+        </div>
+
+        <!-- Preview -->
+        <div class="cf-label" style="margin-bottom:4px">預覽（前 60 行）</div>
+        <textarea id="genPreviewArea" readonly style="width:100%;height:160px;background:var(--bg);border:1px solid var(--bd2);color:var(--tx3);font-family:var(--mono);font-size:10px;padding:8px;border-radius:4px;resize:none;outline:none;line-height:1.6"></textarea>
+      </div>
+
+      <div style="display:flex;gap:8px;padding:10px 12px;border-top:1px solid var(--bd);background:var(--s1);flex-shrink:0;flex-wrap:wrap;align-items:center">
+        <button class="btn primary" onclick="genDownload()">⬇ 下載獨立 HTML 執行器</button>
+        <button class="btn sm" onclick="genCopy()">⎘ 複製程式碼</button>
+        <span id="genSizeLabel" style="font-size:10px;color:var(--tx3);margin-left:auto"></span>
+      </div>
+    </div>
 
 </div><!-- /.shell -->
 
@@ -1855,9 +1915,10 @@ function setMode(mode){
 }
 
 function switchTab(name){
-  const names=['editor','library','config','install'];
+  const names=['editor','library','config','install','generator'];
   document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('on',names[i]===name));
   document.querySelectorAll('.tabpanel').forEach(p=>p.classList.toggle('on',p.id===`tp-${name}`));
+  if(name==='generator') initGenerator();
 }
 
 function setStatus(state,text){
@@ -1908,6 +1969,455 @@ function mobSwitch(panel,btn){
   if(cmdP)  cmdP.style.display=panel==='cmd'?'flex':'none';
   if(midP)  midP.style.display=panel==='editor'?'flex':'none';
   if(logP)  logP.style.display=panel==='log'?'flex':'none';
+}
+
+// ═══════════════════════════════════════════
+// PATH C: STANDALONE HTML GENERATOR
+// ═══════════════════════════════════════════
+
+let _genOutput = '';
+let _genBatchSel = new Set();
+let _genInited = false;
+
+function initGenerator() {
+  if (_genInited) { genRefreshSel(); return; }
+  _genInited = true;
+  genRefreshSel();
+  genPreview();
+}
+
+function genRefreshSel() {
+  const sel = document.getElementById('genScriptSel');
+  if (!sel) return;
+  // clear except first option
+  while (sel.options.length > 1) sel.remove(1);
+  // add builtin groups
+  const GROUPS = [
+    {key:'gemini', label:'🤖 Gemini'},
+    {key:'google', label:'🔍 Google Search'},
+    {key:'maps',   label:'📍 Google Maps'},
+    {key:'docs',   label:'📄 Google Docs'},
+    {key:'youtube',label:'▶ YouTube'},
+  ];
+  GROUPS.forEach(g => {
+    const items = BUILTIN_SCRIPTS.filter(s => s.group === g.key);
+    if (!items.length) return;
+    const og = document.createElement('optgroup');
+    og.label = g.label;
+    items.forEach(s => {
+      const o = document.createElement('option');
+      o.value = s.id; o.textContent = s.name;
+      og.appendChild(o);
+    });
+    sel.appendChild(og);
+  });
+  // add user library
+  if (userLib.length) {
+    const og = document.createElement('optgroup');
+    og.label = '📁 我的腳本庫';
+    userLib.forEach((s, i) => {
+      const o = document.createElement('option');
+      o.value = '__lib_' + i; o.textContent = s.name;
+      og.appendChild(o);
+    });
+    sel.appendChild(og);
+  }
+  // batch pick list
+  genRefreshBatchList();
+}
+
+function genRefreshBatchList() {
+  const el = document.getElementById('batchPickList');
+  if (!el) return;
+  const all = [
+    ...BUILTIN_SCRIPTS,
+    ...userLib.map((s, i) => ({...s, id: '__lib_' + i}))
+  ];
+  const GROUPS = [
+    {key:'gemini', label:'🤖 Gemini'},
+    {key:'google', label:'🔍 Google Search'},
+    {key:'maps',   label:'📍 Google Maps'},
+    {key:'docs',   label:'📄 Google Docs'},
+    {key:'youtube',label:'▶ YouTube'},
+    {key:undefined, label:'📁 我的腳本庫'},
+  ];
+  let html = '';
+  GROUPS.forEach(g => {
+    const items = g.key ? all.filter(s => s.group === g.key) : userLib.map((s,i)=>({...s,id:'__lib_'+i}));
+    if (!items.length) return;
+    html += `<div class="g-label" style="padding:4px 0 2px">${g.label}</div>`;
+    html += items.map(s =>
+      `<div class="lib-item" style="padding:5px 8px;margin-bottom:2px" onclick="toggleGenBatch('${s.id}',this)">
+        <span style="color:${_genBatchSel.has(s.id)?'var(--gn)':'var(--tx3)'};">${_genBatchSel.has(s.id)?'✓':'○'}</span>
+        <span>${s.icon||'📄'}</span>
+        <span class="lib-name">${s.name}</span>
+        <span class="lib-count">${s.steps.length}步</span>
+      </div>`
+    ).join('');
+  });
+  el.innerHTML = html;
+}
+
+function toggleGenBatch(id, el) {
+  if (_genBatchSel.has(id)) _genBatchSel.delete(id);
+  else _genBatchSel.add(id);
+  genRefreshBatchList();
+  genPreview();
+}
+
+function toggleBatchMode() {
+  const on = document.getElementById('genBatch').checked;
+  document.getElementById('batchPickWrap').style.display = on ? '' : 'none';
+  document.getElementById('genScriptSel').disabled = on;
+  if (on) {
+    // pre-select all builtin
+    BUILTIN_SCRIPTS.forEach(s => _genBatchSel.add(s.id));
+    genRefreshBatchList();
+  }
+  genPreview();
+}
+
+function genGetScripts() {
+  const batch = document.getElementById('genBatch')?.checked;
+  if (batch) {
+    const all = [...BUILTIN_SCRIPTS, ...userLib.map((s,i)=>({...s,id:'__lib_'+i}))];
+    return all.filter(s => _genBatchSel.has(s.id));
+  }
+  const selVal = document.getElementById('genScriptSel')?.value || '__current__';
+  if (selVal === '__current__') {
+    const name = document.getElementById('scriptName')?.value || '目前腳本';
+    return [{ id:'current', name, icon:'▶', group:'custom',
+      steps: steps.map(s => ({cmdId:s.cmdId, values:{...s.values}})) }];
+  }
+  if (selVal.startsWith('__lib_')) {
+    const idx = parseInt(selVal.replace('__lib_',''));
+    return [userLib[idx]];
+  }
+  const s = BUILTIN_SCRIPTS.find(x => x.id === selVal);
+  return s ? [s] : [];
+}
+
+function genPreview() {
+  const title = document.getElementById('genTitle')?.value || 'MCP RPA 執行器';
+  const delay = parseInt(document.getElementById('genDelay')?.value) || 800;
+  const errH  = document.getElementById('genError')?.value || 'stop';
+  const scripts = genGetScripts();
+  if (!scripts.length) {
+    document.getElementById('genPreviewArea').value = '（未選擇腳本）';
+    document.getElementById('genSizeLabel').textContent = '';
+    return;
+  }
+  _genOutput = buildStandaloneHTML(scripts, title, delay, errH);
+  const preview = _genOutput.split('\n').slice(0, 60).join('\n');
+  document.getElementById('genPreviewArea').value = preview + '\n...';
+  const kb = Math.round(_genOutput.length / 1024);
+  document.getElementById('genSizeLabel').textContent = `${scripts.length} 個腳本 · ${kb} KB`;
+}
+
+function genDownload() {
+  genPreview(); // ensure fresh
+  if (!_genOutput) { addLog('WARN','請先選擇腳本'); return; }
+  const scripts = genGetScripts();
+  const filename = (scripts.length === 1 ? scripts[0].name : '批次執行器')
+    .replace(/[①-⑯：\s\/\\]/g,'_').replace(/_+/g,'_') + '_runner.html';
+  const blob = new Blob([_genOutput], {type:'text/html'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+  addLog('OK', `✓ 已下載：${filename}（${Math.round(_genOutput.length/1024)} KB）`);
+}
+
+function genCopy() {
+  genPreview();
+  if (!_genOutput) return;
+  navigator.clipboard?.writeText(_genOutput).then(()=>{
+    addLog('OK','✓ 已複製到剪貼簿');
+  }).catch(()=>{
+    const ta = document.createElement('textarea');
+    ta.value = _genOutput; document.body.appendChild(ta);
+    ta.select(); document.execCommand('copy'); ta.remove();
+    addLog('OK','✓ 已複製');
+  });
+}
+
+// ── Core HTML builder ──
+function buildStandaloneHTML(scripts, title, delay, errorHandling) {
+  const safeTitle = title.replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const scriptsJSON = JSON.stringify(scripts.map(s=>({
+    id: s.id, name: s.name, icon: s.icon||'▶', group: s.group||'custom',
+    steps: (s.steps||[]).map(st=>({cmdId:st.cmdId, values:{...st.values}}))
+  })));
+
+  return `<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${safeTitle}</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0a0b0e;--s1:#111318;--s2:#181c24;--bd:#252932;--bd2:#2e3440;--ac:#00d4ff;--gn:#00ff88;--rd:#ff4455;--yw:#ffcc00;--tx:#e0e6f0;--tx2:#8892a0;--tx3:#4a5568;--mono:'IBM Plex Mono',monospace}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--tx);font-family:var(--mono);font-size:13px;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,transparent,transparent 24px,rgba(0,212,255,.013) 25px)}
+header{display:flex;align-items:center;gap:10px;padding:0 14px;height:48px;background:rgba(10,11,14,.97);border-bottom:1px solid var(--bd);flex-shrink:0;z-index:10;position:relative}
+.logo{width:20px;height:20px;background:var(--ac);clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);animation:lp 3s ease-in-out infinite;flex-shrink:0}
+@keyframes lp{0%,100%{opacity:1}50%{opacity:.65}}
+.brand{font-size:13px;font-weight:600;color:var(--ac)}
+.sub{font-size:9px;color:var(--tx3);letter-spacing:.18em;text-transform:uppercase}
+.hsp{flex:1}
+.spill{display:flex;align-items:center;gap:5px;padding:3px 8px;border:1px solid var(--bd2);border-radius:20px;background:var(--bg);font-size:10px;color:var(--tx3)}
+.sdot{width:6px;height:6px;border-radius:50%;background:var(--tx3);transition:all .3s}
+.sdot.run{background:var(--yw);box-shadow:0 0 5px var(--yw)}
+.sdot.done{background:var(--gn);box-shadow:0 0 5px var(--gn)}
+.sdot.err{background:var(--rd);box-shadow:0 0 5px var(--rd)}
+.sdot.ext{background:var(--gn);box-shadow:0 0 5px var(--gn);animation:bk 2s infinite}
+@keyframes bk{0%,100%{opacity:1}50%{opacity:.25}}
+.run-bar{height:2px;background:linear-gradient(90deg,transparent,var(--ac),transparent);background-size:200%;animation:sh 1.1s linear infinite;display:none;position:relative;z-index:5}
+.run-bar.on{display:block}
+@keyframes sh{0%{background-position:-200%}100%{background-position:200%}}
+.shell{display:grid;grid-template-columns:260px 1fr;flex:1;overflow:hidden;position:relative;z-index:1}
+@media(max-width:640px){.shell{grid-template-columns:1fr}}
+.pnl{display:flex;flex-direction:column;border-right:1px solid var(--bd);overflow:hidden}
+.pnl:last-child{border-right:none}
+.ph{display:flex;align-items:center;justify-content:space-between;padding:9px 13px;border-bottom:1px solid var(--bd);background:var(--s1);flex-shrink:0;font-size:10px;text-transform:uppercase;letter-spacing:.18em;color:var(--tx3)}
+.pb{flex:1;overflow-y:auto;padding:10px}
+.pb::-webkit-scrollbar{width:3px}
+.pb::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:2px}
+.glb{font-size:9px;text-transform:uppercase;letter-spacing:.2em;color:var(--tx3);padding:8px 0 4px}
+.li{display:flex;align-items:center;gap:8px;padding:7px 9px;background:var(--s1);border:1px solid var(--bd);border-radius:4px;cursor:pointer;margin-bottom:3px;transition:all .15s}
+.li:hover{border-color:var(--bd2)}
+.li.on{border-color:var(--ac);background:rgba(0,212,255,.05)}
+.li-name{flex:1;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tab-bar{display:flex;border-bottom:1px solid var(--bd);flex-shrink:0;background:var(--s1)}
+.tb{padding:9px 13px;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--tx3);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s}
+.tb.on{color:var(--ac);border-bottom-color:var(--ac)}
+.run-panel{flex:1;overflow:hidden;display:flex;flex-direction:column}
+.log-panel{flex:1;overflow:hidden;display:none;flex-direction:column}
+.sc{display:flex;flex-direction:column;gap:4px}
+.sc-card{background:var(--s1);border:1px solid var(--bd);border-radius:4px;padding:8px 10px;display:flex;align-items:flex-start;gap:8px;position:relative}
+.sc-card.active{border-color:var(--yw);box-shadow:0 0 8px rgba(255,204,0,.12)}
+.sc-card.done{border-color:var(--gn);opacity:.7}
+.sc-card.err{border-color:var(--rd)}
+.sc-num{font-size:10px;color:var(--tx3);min-width:18px;text-align:right;margin-top:2px}
+.sc-ico{width:24px;height:24px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0}
+.sc-body{flex:1;min-width:0}
+.sc-type{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.12em;color:var(--ac);margin-bottom:2px}
+.sc-val{font-size:10px;color:var(--tx2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sc-state{position:absolute;right:8px;top:8px;font-size:11px}
+.exec-bar{display:flex;align-items:center;gap:7px;padding:9px 13px;border-top:1px solid var(--bd);background:var(--s1);flex-shrink:0;flex-wrap:wrap}
+.prog{flex:1;height:3px;background:var(--bd);border-radius:2px;overflow:hidden;min-width:50px}
+.pf{height:100%;background:var(--ac);border-radius:2px;transition:width .4s}
+.einf{font-size:10px;color:var(--tx3)}
+.btn{display:inline-flex;align-items:center;gap:5px;padding:6px 11px;border:1px solid var(--bd2);background:var(--s2);color:var(--tx2);border-radius:4px;cursor:pointer;font-family:var(--mono);font-size:11px;transition:all .15s;white-space:nowrap}
+.btn:hover{border-color:var(--ac);color:var(--ac);background:rgba(0,212,255,.06)}
+.btn:active{transform:scale(.97)}
+.btn.p{background:var(--ac);border-color:var(--ac);color:#000;font-weight:600}
+.btn.p:hover{background:#00b8d9;color:#000}
+.btn.d{border-color:var(--rd);color:var(--rd)}
+.btn.s{border-color:var(--gn);color:var(--gn)}
+.btn.w{border-color:var(--yw);color:var(--yw)}
+.btn.sm{padding:4px 8px;font-size:10px}
+.mb.on{border-color:var(--ac);color:var(--ac);background:rgba(0,212,255,.08)}
+.ext-banner{display:none;align-items:center;gap:8px;padding:7px 13px;border-top:1px solid rgba(0,255,136,.2);background:rgba(0,255,136,.05);font-size:11px;color:var(--gn);flex-shrink:0}
+.log-list{display:flex;flex-direction:column;gap:1px}
+.lr{display:flex;gap:6px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.03);font-size:10px;animation:fi .2s ease}
+@keyframes fi{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:translateY(0)}}
+.lt{color:var(--tx3);flex-shrink:0}.ll{flex-shrink:0;width:30px;font-weight:600}
+.ll.INFO{color:var(--ac)}.ll.OK{color:var(--gn)}.ll.WARN{color:var(--yw)}.ll.ERR{color:var(--rd)}.ll.SYS{color:var(--tx3)}
+.lm{flex:1;color:var(--tx2);word-break:break-all}
+.vw{margin-top:8px;display:none}
+.vr{display:flex;gap:8px;font-size:10px;padding:3px 7px;background:var(--s1);border:1px solid var(--bd);border-radius:2px;margin-bottom:2px}
+.vk{color:var(--ac);flex-shrink:0;min-width:80px}.vv{color:var(--tx2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"></div>
+  <div><div class="brand">${safeTitle}</div><div class="sub">MCP · RPA 獨立執行器</div></div>
+  <div class="hsp"></div>
+  <div class="spill"><div class="sdot" id="sdot"></div><span id="stext">待機</span></div>
+  <button class="btn sm" onclick="document.getElementById('fi').click()" style="margin-left:6px">↑ 匯入腳本</button>
+  <input type="file" id="fi" accept=".json" style="display:none" onchange="importScript(event)">
+</header>
+<div class="run-bar" id="runBar"></div>
+
+<div class="shell">
+  <!-- LEFT: Script List -->
+  <div class="pnl">
+    <div class="ph"><span>腳本選擇</span><span id="cnt" style="background:var(--bd2);color:var(--tx2);border-radius:9px;font-size:9px;padding:1px 6px;font-weight:600">${scripts.length}</span></div>
+    <div class="pb" id="SL"></div>
+  </div>
+
+  <!-- RIGHT: Run + Log -->
+  <div class="pnl" style="border-right:none">
+    <div class="tab-bar">
+      <div class="tb on" id="tRun" onclick="swTab('run')">執行</div>
+      <div class="tb"    id="tLog" onclick="swTab('log')">日誌</div>
+    </div>
+
+    <div class="run-panel" id="pRun">
+      <div class="pb" id="stepList"></div>
+      <div class="vw" id="vWrap"><div style="font-size:9px;text-transform:uppercase;letter-spacing:.15em;color:var(--tx3);margin-bottom:4px">執行變數</div><div id="vDisp"></div></div>
+      <div class="ext-banner" id="extBanner">
+        <span>⬡</span><span>Extension 模式 — 腳本真實執行</span>
+        <button class="btn sm" onclick="checkExt()" style="margin-left:auto;border-color:var(--gn);color:var(--gn)">◎ 偵測</button>
+      </div>
+      <div class="exec-bar">
+        <button class="btn p"  onclick="runScript()" id="runBtn">▶ 執行</button>
+        <button class="btn d"  onclick="stopScript()" id="stopBtn" style="display:none">■ 停止</button>
+        <button class="btn w sm" onclick="pauseScript()" id="pauseBtn" style="display:none">⏸ 暫停</button>
+        <div class="prog"><div class="pf" id="pFill"></div></div>
+        <div class="einf" id="eInf">就緒</div>
+        <div style="display:flex;align-items:center;gap:4px;margin-left:auto">
+          <span style="font-size:9px;color:var(--tx3);text-transform:uppercase;letter-spacing:.12em">模式</span>
+          <button class="btn sm mb on" id="mSim" onclick="setMode('simulate')">⬡ 模擬</button>
+          <button class="btn sm mb"    id="mExt" onclick="setMode('extension')">⬡ EXT</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="log-panel" id="pLog">
+      <div class="pb"><div class="log-list" id="logList"></div></div>
+      <div style="padding:8px 12px;border-top:1px solid var(--bd);display:flex;gap:6px;background:var(--s1);flex-shrink:0">
+        <button class="btn sm" onclick="clearLog()">⌫ 清除</button>
+        <button class="btn sm" onclick="exportLog()" style="margin-left:auto">↓ 匯出</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const SCRIPTS=${scriptsJSON};
+const CFG={delay:${delay},errorHandling:'${errorHandling}',timeout:15000};
+const ICONS={navigate:'🌐',tab_new:'＋',tab_close:'✕',reload:'↻',back:'←',forward:'→',click:'👆',dblclick:'👆',hover:'🖱',type:'⌨',select:'☰',key_press:'⌥',scroll:'↕',scroll_to:'↕',wait:'⏱',wait_selector:'⏳',wait_url:'⏳',extract_text:'📋',extract_attr:'🏷',get_url:'🔗',screenshot:'📸',js_eval:'⚡',js_inject:'📦',cookie_get:'🍪',cookie_set:'🍪',storage_get:'💾',condition:'◇',loop:'↺'};
+const GROUPS=[{k:'gemini',l:'🤖 Gemini'},{k:'google',l:'🔍 Google Search'},{k:'maps',l:'📍 Google Maps'},{k:'docs',l:'📄 Google Docs'},{k:'youtube',l:'▶ YouTube'},{k:'custom',l:'📦 自訂腳本'}];
+let selId=null,curSteps=[],isRunning=false,isPaused=false,shouldStop=false,curIdx=-1,vars={},execMode='simulate',logs=[];
+window.__extDetected=false;
+
+function init(){
+  renderList();
+  setTimeout(()=>window.postMessage({type:'MCP_RPA_PING',from:'page'},'*'),800);
+  log('SYS','MCP RPA 獨立執行器已啟動');
+  log('SYS',\`共 \${SCRIPTS.length} 個腳本 · 選擇後點 ▶ 執行\`);
+}
+
+function renderList(){
+  let html='';
+  GROUPS.forEach(g=>{
+    const items=SCRIPTS.filter(s=>s.group===g.k);
+    if(!items.length)return;
+    html+=\`<div class="glb">\${g.l}</div>\`;
+    html+=items.map(s=>\`<div class="li\${s.id===selId?' on':''}" onclick="selScript('\${s.id}')">
+      <span>\${s.icon||'▶'}</span><span class="li-name">\${esc(s.name)}</span>
+      <span style="font-size:10px;color:var(--tx3)">\${s.steps.length}步</span></div>\`).join('');
+  });
+  document.getElementById('SL').innerHTML=html||'<div style="padding:20px;text-align:center;color:var(--tx3);font-size:11px">無可用腳本</div>';
+}
+
+function selScript(id){
+  selId=id;
+  const s=SCRIPTS.find(x=>x.id===id);if(!s)return;
+  curSteps=s.steps.map(st=>({...st,status:'',values:{...st.values}}));
+  vars={};document.getElementById('vWrap').style.display='none';
+  renderSteps();renderList();
+  log('INFO',\`載入：\${s.name}（\${s.steps.length}步）\`);
+}
+
+function renderSteps(){
+  const el=document.getElementById('stepList');
+  if(!curSteps.length){el.innerHTML='<div style="padding:20px;text-align:center;color:var(--tx3);font-size:12px">← 從左側選擇腳本</div>';return;}
+  el.innerHTML=curSteps.map((s,i)=>{
+    const ico=ICONS[s.cmdId]||'●';
+    const mv=Object.values(s.values||{})[0]||'';
+    const st=s.status==='done'?'<span style="color:var(--gn)">✓</span>':s.status==='err'?'<span style="color:var(--rd)">✗</span>':i===curIdx&&isRunning?'<span style="color:var(--yw)">●</span>':'';
+    const cls='sc-card'+(i===curIdx&&isRunning?' active':'')+(s.status==='done'?' done':'')+(s.status==='err'?' err':'');
+    return \`<div class="\${cls}"><span class="sc-num">\${i+1}</span><span class="sc-ico">\${ico}</span>
+      <div class="sc-body"><div class="sc-type">\${s.cmdId}</div><div class="sc-val">\${esc(String(mv).slice(0,60))}</div></div>
+      <div class="sc-state">\${st}</div></div>\`;
+  }).join('');
+}
+
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+async function runScript(){
+  if(!curSteps.length){log('WARN','未選擇腳本');return;}
+  if(isRunning)return;
+  isRunning=true;shouldStop=false;isPaused=false;curIdx=-1;vars={};
+  curSteps.forEach(s=>{s.status='';});
+  renderSteps();
+  document.getElementById('runBtn').style.display='none';
+  document.getElementById('stopBtn').style.display='';
+  document.getElementById('pauseBtn').style.display='';
+  document.getElementById('runBar').classList.add('on');
+  setSt('run','執行中...');
+  const sc=SCRIPTS.find(s=>s.id===selId);
+  log('INFO',\`▶ \${sc?.name}（\${curSteps.length}步）[\${execMode}]\`);
+  for(let i=0;i<curSteps.length;i++){
+    if(shouldStop){log('WARN','⏸ 停止');break;}
+    while(isPaused){await sl(200);if(shouldStop)break;}
+    curIdx=i;renderSteps();prog(i,curSteps.length);
+    const step=curSteps[i];
+    const mv=Object.values(step.values||{})[0]||'';
+    log('INFO',\`[\${i+1}/\${curSteps.length}] \${step.cmdId}: \${String(mv).slice(0,50)}\`);
+    try{
+      await exec(step);step.status='done';log('OK','✓ 完成');
+    }catch(err){
+      step.status='err';log('ERR',\`✗ \${err.message}\`);
+      if(CFG.errorHandling==='stop'){log('ERR','遇錯停止');break;}
+      if(CFG.errorHandling==='retry'){try{await sl(1000);await exec(step);step.status='done';log('OK','重試成功');}catch(e){log('ERR',\`重試失敗：\${e.message}\`);}}
+    }
+    renderSteps();
+    if(i<curSteps.length-1&&!shouldStop)await sl(CFG.delay);
+  }
+  finish();
+}
+
+async function exec(step){
+  if(execMode==='extension'){
+    return new Promise((res,rej)=>{
+      const rid='r'+Date.now()+Math.random().toString(36).slice(2);
+      const t=setTimeout(()=>{window.removeEventListener('message',h);rej(new Error('Extension 逾時'));},CFG.timeout);
+      const h=e=>{if(e.source!==window)return;if(e.data?.type==='MCP_RPA_RESULT'&&e.data?.rid===rid){window.removeEventListener('message',h);clearTimeout(t);e.data.error?rej(new Error(e.data.error)):res(e.data.result);}};
+      window.addEventListener('message',h);
+      window.postMessage({type:'MCP_RPA_EXEC',from:'page',rid,step:{cmdId:step.cmdId,values:step.values||{}}},'*');
+    });
+  }
+  const v=step.values||{};
+  log('SYS',\`[模擬] \${step.cmdId}: \${String(Object.values(v)[0]||'').slice(0,50)}\`);
+  await sl(step.cmdId==='wait'?Math.min(parseInt(v.ms)||1000,2000):100+Math.random()*100);
+}
+
+function stopScript(){shouldStop=true;log('WARN','停止請求...');}
+function pauseScript(){isPaused=!isPaused;document.getElementById('pauseBtn').textContent=isPaused?'▶ 繼續':'⏸ 暫停';setSt(isPaused?'':'run',isPaused?'已暫停':'執行中...');}
+function finish(){
+  isRunning=false;curIdx=-1;isPaused=false;
+  document.getElementById('runBtn').style.display='';
+  document.getElementById('stopBtn').style.display='none';
+  document.getElementById('pauseBtn').style.display='none';
+  document.getElementById('pauseBtn').textContent='⏸ 暫停';
+  document.getElementById('runBar').classList.remove('on');
+  setSt('done','執行完畢');log('OK','▣ 完畢');
+  const keys=Object.keys(vars);
+  if(keys.length){const w=document.getElementById('vWrap');w.style.display='';document.getElementById('vDisp').innerHTML=keys.map(k=>\`<div class="vr"><span class="vk">\${esc(k)}</span><span class="vv">\${esc(JSON.stringify(vars[k]).slice(0,80))}</span></div>\`).join('');}
+  renderSteps();
+}
+function prog(c,t){const p=t?Math.round(c/t*100):0;document.getElementById('pFill').style.width=p+'%';document.getElementById('eInf').textContent=\`\${c}/\${t}\`;}
+function sl(ms){return new Promise(r=>setTimeout(r,ms));}
+function setSt(state,text){document.getElementById('sdot').className='sdot '+(state||'');document.getElementById('stext').textContent=text||'待機';}
+function setMode(m){execMode=m;['Sim','Ext'].forEach(x=>document.getElementById('m'+x).classList.toggle('on',m===(x==='Sim'?'simulate':'extension')));document.getElementById('extBanner').style.display=m==='extension'?'flex':'none';if(m==='extension')checkExt();}
+function checkExt(){window.__extDetected=false;window.postMessage({type:'MCP_RPA_PING',from:'page'},'*');setTimeout(()=>{if(!window.__extDetected){log('WARN','Extension 未偵測 — 請安裝並啟用');setSt('','等待 Extension');}},700);}
+window.addEventListener('message',e=>{if(e.source!==window)return;if(e.data?.type==='MCP_RPA_PONG'&&e.data?.from==='extension'){window.__extDetected=true;log('OK','✓ Extension 就緒');setSt('ext','Extension 就緒');}});
+function swTab(t){document.getElementById('pRun').style.display=t==='run'?'flex':'none';document.getElementById('pLog').style.display=t==='log'?'flex':'none';['Run','Log'].forEach(x=>{const tb=document.getElementById('t'+x);tb.classList.toggle('on',t===x.toLowerCase());});}
+function log(level,msg){logs.unshift({t:new Date().toTimeString().slice(0,8),level,msg});if(logs.length>300)logs.pop();const el=document.getElementById('logList');const r=document.createElement('div');r.className='lr';r.innerHTML=\`<span class="lt">\${logs[0].t}</span><span class="ll \${level}">\${level}</span><span class="lm">\${esc(msg)}</span>\`;el.prepend(r);if(el.children.length>200)el.lastChild.remove();}
+function clearLog(){document.getElementById('logList').innerHTML='';logs=[];}
+function exportLog(){const txt=logs.map(l=>\`[\${l.t}] \${l.level} \${l.msg}\`).join('\\n');const b=new Blob([txt],{type:'text/plain'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download='log-'+Date.now()+'.txt';a.click();URL.revokeObjectURL(u);}
+function importScript(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{try{const d=JSON.parse(ev.target.result);if(!d.steps)throw new Error('格式錯誤');const c={id:'c'+Date.now(),name:d.name||f.name,icon:'📦',group:'custom',steps:d.steps};SCRIPTS.push(c);renderList();selScript(c.id);log('OK',\`✓ 匯入：\${c.name}\`);}catch(err){log('ERR',\`匯入失敗：\${err.message}\`);}};r.readAsText(f);e.target.value='';}
+init();
+<\/script>
+</body>
+</html>`;
 }
 
 // ── BOOT ──
